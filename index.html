@@ -96,6 +96,13 @@
   code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
   .dropzone { border: 1px dashed var(--border); border-radius: 10px; padding: 10px 14px; font-size: 12px; color: var(--muted); }
   .dropzone.drag { border-color: var(--accent); color: var(--text); background: var(--panel-2); }
+  /* ----- scenario picker ----- */
+  .scenario-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 20px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
+  .scenario-bar label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .scenario-bar select { font-size: 14px; font-weight: 600; min-width: 280px; }
+  .scn-blurb { font-size: 13px; color: var(--muted); flex: 1; min-width: 200px; }
+
   /* ----- race ----- */
   .race-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
   .race-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
@@ -159,11 +166,17 @@
     <div class="controls">
       <label class="btn" for="file">Upload logs</label>
       <input id="file" type="file" accept=".json" multiple hidden />
-      <button class="btn ghost" id="reset">Reset to samples</button>
+      <button class="btn ghost" id="reset">Reset example</button>
     </div>
   </header>
 
-  <div id="dropzone" class="dropzone" style="margin-top:16px;">Drag &amp; drop conversation JSON here, or use <strong>Upload logs</strong>. Formats auto-detect: native · OpenAI/ChatGPT · Gemini · LangGraph.</div>
+  <div class="scenario-bar">
+    <label for="scenario">Example workload</label>
+    <select id="scenario"></select>
+    <span class="scn-blurb" id="scn-blurb"></span>
+  </div>
+
+  <div id="dropzone" class="dropzone" style="margin-top:14px;">Or bring your own: drag &amp; drop conversation JSON here, or use <strong>Upload logs</strong>. Formats auto-detect: native · OpenAI/ChatGPT · Gemini · LangGraph.</div>
 
   <div class="cards" id="cards"></div>
 
@@ -210,75 +223,241 @@
   </div>
 </div>
 
-<!-- ===== Embedded sample logs (one per supported format) ===== -->
-<script type="application/json" id="sample-claude">
+<!-- ===== Embedded example workloads — each won by a different agent ===== -->
+<script type="application/json" id="scenarios">
 {
-  "agent": "Claude", "model": "claude-sonnet", "provider": "anthropic",
-  "task_id": "fix-parse-duration", "success_turn": 4, "final_correct": true, "final_score": 1.0,
-  "turns": [
-    {"role": "user", "content": "The test for parse_duration() is failing. It should turn strings like '1h30m' and '45s' into seconds. Here is the current code and the failing test output. Please fix it."},
-    {"role": "assistant", "content": "Let me look at the function and the test to understand the gap. I'll read the source first.", "tool_calls": [{"name": "read_file", "arguments": {"path": "durations.py"}, "ok": true, "result": "def parse_duration(s): return int(s)"}]},
-    {"role": "assistant", "content": "The current implementation just calls int(s), so any unit suffix raises a ValueError. I'll rewrite it to parse hours, minutes, and seconds with a regex and sum them.", "tool_calls": [{"name": "write_file", "arguments": {"path": "durations.py", "content": "import re\nUNITS={'h':3600,'m':60,'s':1}\ndef parse_duration(s):\n    total=0\n    for value,unit in re.findall(r'(\\d+)([hms])', s):\n        total+=int(value)*UNITS[unit]\n    return total"}, "ok": true}]},
-    {"role": "assistant", "content": "Now I'll run the test suite to confirm the fix.", "tool_calls": [{"name": "run_tests", "arguments": {"path": "test_durations.py"}, "ok": true, "result": "5 passed in 0.03s"}]},
-    {"role": "assistant", "content": "All 5 tests pass. parse_duration now handles combined units like '1h30m' (5400s) and single units like '45s'. The fix uses a regex to extract each value/unit pair and sums them against a units table."}
-  ]
-}
-</script>
-<script type="application/json" id="sample-chatgpt">
-{
-  "agent": "ChatGPT", "model": "gpt-4o", "provider": "openai",
-  "task_id": "fix-parse-duration", "success_turn": 4, "final_correct": true, "final_score": 1.0,
-  "messages": [
-    {"role": "system", "content": "You are a coding assistant with access to a Python tool runner."},
-    {"role": "user", "content": "parse_duration() is failing. It should convert '1h30m', '45s', etc. into total seconds. Fix it."},
-    {"role": "assistant", "content": "I'll write a regex-based parser that maps h/m/s to seconds and run it.", "tool_calls": [{"function": {"name": "python", "arguments": "{\"code\": \"import re\\nUNITS={'h':3600,'m':60,'s':1}\\ndef parse_duration(s):\\n    return sum(int(v)*UNITS[u] for v,u in re.findall(r'(\\\\d+)([hms])', s))\\nprint(parse_duration('1h30m'), parse_duration('45s'))\"}"}, "ok": true, "result": "5400 45"}]},
-    {"role": "tool", "content": "5400 45"},
-    {"role": "assistant", "content": "The parser returns 5400 for '1h30m' and 45 for '45s', which matches the expected values. Here is the final implementation using re.findall over each value/unit pair."}
-  ]
-}
-</script>
-<script type="application/json" id="sample-gemini">
-{
-  "agent": "Gemini", "model": "gemini-1.5-pro", "provider": "google",
-  "task_id": "fix-parse-duration", "success_turn": null, "final_correct": false, "final_score": 0.6,
-  "contents": [
-    {"role": "user", "parts": [{"text": "parse_duration() is failing. It should convert strings like '1h30m' and '45s' into total seconds. Please fix the function."}]},
-    {"role": "model", "parts": [{"text": "I'll split the string on the letter 'm' and convert each side to a number."}]},
-    {"role": "model", "parts": [{"text": "Running my first attempt."}, {"functionCall": {"name": "run_code", "args": {"code": "def parse_duration(s): h,m=s.split('m'); return int(h)*60+int(m)"}}}, {"functionResponse": {"name": "run_code", "response": "ValueError: invalid literal for int() with base 10: '1h30'"}}]},
-    {"role": "user", "parts": [{"text": "No, that's wrong. It crashes on '1h30m' and ignores seconds entirely. Try again."}]},
-    {"role": "model", "parts": [{"text": "Sorry about that, my mistake. Let me handle hours and minutes separately."}]},
-    {"role": "model", "parts": [{"functionCall": {"name": "run_code", "args": {"code": "def parse_duration(s): return int(s.replace('h','*3600+').replace('m','*60+').replace('s','')[:-1])"}}}, {"functionResponse": {"name": "run_code", "response": "SyntaxError: invalid expression"}}]},
-    {"role": "user", "parts": [{"text": "Still failing. That string-replace approach doesn't evaluate the arithmetic. Use a proper parser."}]},
-    {"role": "model", "parts": [{"text": "Let me try again with a regex over hours and minutes."}]},
-    {"role": "model", "parts": [{"functionCall": {"name": "run_code", "args": {"code": "import re\ndef parse_duration(s):\n    h=re.search(r'(\\d+)h', s); m=re.search(r'(\\d+)m', s)\n    return (int(h.group(1)) if h else 0)*3600 + (int(m.group(1)) if m else 0)*60"}}}, {"functionResponse": {"name": "run_code", "response": "parse_duration('1h30m')=5400 OK; parse_duration('45s')=0 FAIL"}}]},
-    {"role": "user", "parts": [{"text": "Closer, but '45s' returns 0 because you never handle seconds."}]},
-    {"role": "model", "parts": [{"text": "I've added hours and minutes handling. Seconds support is still incomplete, but the common '1h30m' case now works. This is a partial fix."}]}
-  ]
-}
-</script>
-<script type="application/json" id="sample-custom">
-{
-  "agent": "Custom Agent", "model": "claude-haiku", "provider": "custom",
-  "task_id": "fix-parse-duration", "success_turn": 2, "final_correct": true, "final_score": 0.95,
-  "turns": [
-    {"role": "user", "content": "Fix parse_duration() so '1h30m', '45s', '2h', etc. convert to total seconds."},
-    {"role": "assistant", "content": "Regex over each value/unit pair, summed against a units table.", "tool_calls": [{"name": "apply_patch", "arguments": {"path": "durations.py", "diff": "+import re\n+UNITS={'h':3600,'m':60,'s':1}\n+def parse_duration(s):\n+    return sum(int(v)*UNITS[u] for v,u in re.findall(r'(\\d+)([hms])', s))"}, "ok": true}, {"name": "run_tests", "arguments": {"path": "test_durations.py"}, "ok": true, "result": "5 passed"}]},
-    {"role": "assistant", "content": "Done — all 5 tests pass. Single tool-augmented turn: patch applied and verified."}
-  ]
-}
-</script>
-<script type="application/json" id="sample-langgraph">
-{
-  "agent": "LangGraph Agent", "model": "gpt-4o-mini", "provider": "langgraph",
-  "task_id": "fix-parse-duration", "success_turn": 5, "final_correct": true, "final_score": 0.9,
-  "messages": [
-    {"type": "human", "content": "parse_duration() needs to handle '1h30m', '45s', '2h15m10s'. Fix and verify."},
-    {"type": "ai", "content": "Planning: read the file, write a regex parser, run tests.", "tool_calls": [{"name": "read_file", "args": {"path": "durations.py"}}]},
-    {"type": "tool", "content": "def parse_duration(s): return int(s)"},
-    {"type": "ai", "content": "Replacing with a regex-based summation over h/m/s units.", "tool_calls": [{"name": "write_file", "args": {"path": "durations.py", "content": "import re\nUNITS={'h':3600,'m':60,'s':1}\ndef parse_duration(s):\n    return sum(int(v)*UNITS[u] for v,u in re.findall(r'(\\d+)([hms])', s))"}}]},
-    {"type": "ai", "content": "Running the suite.", "tool_calls": [{"name": "run_tests", "args": {"path": "test_durations.py"}}]},
-    {"type": "tool", "content": "5 passed in 0.04s"},
-    {"type": "ai", "content": "All tests pass. parse_duration now sums each value/unit pair, so '2h15m10s' resolves to 8110 seconds."}
+  "scenarios": [
+    {
+      "id": "coding",
+      "title": "🐛 Fix a failing unit test  (Claude wins)",
+      "blurb": "A small bug fix with a test runner. Claude reads, patches, and verifies in one clean pass — the others each need a correction.",
+      "logs": [
+        {
+          "agent": "Claude", "model": "claude-sonnet", "provider": "anthropic",
+          "task_id": "coding-fix", "success_turn": 2, "final_correct": true, "final_score": 1.0,
+          "turns": [
+            {"role": "user", "content": "is_palindrome() fails on strings with capital letters and spaces. Please fix it."},
+            {"role": "assistant", "content": "I'll normalize the input (lowercase, keep only alphanumerics) before comparing to its reverse, then run the tests.", "tool_calls": [{"name": "write_file", "arguments": {"path": "palindrome.py"}, "ok": true}, {"name": "run_tests", "arguments": {"path": "test_palindrome.py"}, "ok": true, "result": "4 passed"}]},
+            {"role": "assistant", "content": "All 4 tests pass. The fix lowercases the string and filters non-alphanumerics, so 'A man, a plan' is now recognized."}
+          ]
+        },
+        {
+          "agent": "ChatGPT", "model": "gpt-4o", "provider": "openai",
+          "task_id": "coding-fix", "success_turn": 4, "final_correct": true, "final_score": 1.0,
+          "messages": [
+            {"role": "user", "content": "is_palindrome() fails on capitals and spaces. Fix it."},
+            {"role": "assistant", "content": "I'll lowercase the string and compare it to its reverse.", "tool_calls": [{"function": {"name": "python", "arguments": {"code": "..."}}, "ok": true, "result": "fails on 'A man a plan'"}]},
+            {"role": "user", "content": "No, that's wrong — you didn't strip spaces and punctuation."},
+            {"role": "assistant", "content": "You're right, let me fix that. Filtering to alphanumerics before the comparison now.", "tool_calls": [{"function": {"name": "python", "arguments": {"code": "..."}}, "ok": true, "result": "4 passed"}]},
+            {"role": "assistant", "content": "Fixed — it now strips non-alphanumeric characters before comparing."}
+          ]
+        },
+        {
+          "agent": "Gemini", "model": "gemini-1.5-pro", "provider": "google",
+          "task_id": "coding-fix", "success_turn": null, "final_correct": false, "final_score": 0.6,
+          "contents": [
+            {"role": "user", "parts": [{"text": "is_palindrome() fails on capitals and spaces. Fix it."}]},
+            {"role": "model", "parts": [{"text": "I'll lowercase the input."}, {"functionCall": {"name": "run_code", "args": {"code": "..."}}}, {"functionResponse": {"name": "run_code", "response": "still fails on spaces"}}]},
+            {"role": "user", "parts": [{"text": "Still failing — spaces and punctuation aren't handled."}]},
+            {"role": "model", "parts": [{"text": "Lowercasing handles the case issue, but stripping spaces and punctuation is still incomplete. Partial fix."}]}
+          ]
+        },
+        {
+          "agent": "Custom Agent", "model": "claude-haiku", "provider": "custom",
+          "task_id": "coding-fix", "success_turn": 3, "final_correct": true, "final_score": 1.0,
+          "turns": [
+            {"role": "user", "content": "Fix is_palindrome() for capitals and spaces."},
+            {"role": "assistant", "content": "Lowercase then reverse-compare.", "tool_calls": [{"name": "apply_patch", "arguments": {"path": "palindrome.py"}, "ok": true}, {"name": "run_tests", "arguments": {}, "ok": false, "result": "2 failed"}]},
+            {"role": "user", "content": "Nope, you skipped punctuation."},
+            {"role": "assistant", "content": "Right — filtering non-alphanumerics now.", "tool_calls": [{"name": "run_tests", "arguments": {}, "ok": true, "result": "4 passed"}]},
+            {"role": "assistant", "content": "Done, 4 passing."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "contract",
+      "title": "📄 Summarize a 40-page contract  (Gemini wins)",
+      "blurb": "Long-context extraction. Gemini ingests the whole document in one shot for pennies; ChatGPT truncates and Claude misses a clause.",
+      "logs": [
+        {
+          "agent": "Gemini", "model": "gemini-1.5-flash", "provider": "google",
+          "task_id": "contract-summary", "success_turn": 1, "final_correct": true, "final_score": 1.0,
+          "contents": [
+            {"role": "user", "parts": [{"text": "Summarize the key obligations, termination clauses, and liability caps in this 40-page MSA."}]},
+            {"role": "model", "parts": [{"text": "Obligations: monthly deliverables and SLAs. Termination: either party on 90 days' written notice. Liability cap: 12 months of fees. All three were found across the full 40 pages."}]}
+          ]
+        },
+        {
+          "agent": "Claude", "model": "claude-sonnet", "provider": "anthropic",
+          "task_id": "contract-summary", "success_turn": 3, "final_correct": true, "final_score": 1.0,
+          "turns": [
+            {"role": "user", "content": "Summarize obligations, termination, and liability caps in this MSA."},
+            {"role": "assistant", "content": "Obligations: monthly deliverables. Termination: 90 days' notice. (No liability cap noted.)"},
+            {"role": "user", "content": "You missed the liability cap section."},
+            {"role": "assistant", "content": "Apologies — the liability cap is 12 months of fees. Full summary now includes obligations, termination, and the cap."}
+          ]
+        },
+        {
+          "agent": "ChatGPT", "model": "gpt-4o", "provider": "openai",
+          "task_id": "contract-summary", "success_turn": null, "final_correct": false, "final_score": 0.7,
+          "messages": [
+            {"role": "user", "content": "Summarize this 40-page MSA: obligations, termination, liability."},
+            {"role": "assistant", "content": "I can see roughly the first 15 pages. Obligations and termination (90 days) are summarized, but the liability section is later in the document and was truncated from my context."}
+          ]
+        },
+        {
+          "agent": "Custom Agent", "model": "claude-haiku", "provider": "custom",
+          "task_id": "contract-summary", "success_turn": null, "final_correct": false, "final_score": 0.0,
+          "turns": [
+            {"role": "user", "content": "Summarize this 40-page MSA."},
+            {"role": "assistant", "content": "The document exceeds my context window, so I couldn't process the full agreement."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "title": "🔎 Web research with a citation  (ChatGPT wins)",
+      "blurb": "Find a current fact and link the source. ChatGPT searches and cites it directly; the others answer from stale memory first.",
+      "logs": [
+        {
+          "agent": "ChatGPT", "model": "gpt-4o", "provider": "openai",
+          "task_id": "research-cite", "success_turn": 2, "final_correct": true, "final_score": 1.0,
+          "messages": [
+            {"role": "user", "content": "Find the current stable Python version and link the official release page."},
+            {"role": "assistant", "content": "Searching python.org.", "tool_calls": [{"function": {"name": "web_search", "arguments": {"q": "current stable python version"}}, "ok": true, "result": "Python 3.12.4 — python.org/downloads"}]},
+            {"role": "assistant", "content": "The latest stable release is Python 3.12.4. Source: https://www.python.org/downloads/"}
+          ]
+        },
+        {
+          "agent": "Claude", "model": "claude-sonnet", "provider": "anthropic",
+          "task_id": "research-cite", "success_turn": 3, "final_correct": true, "final_score": 1.0,
+          "turns": [
+            {"role": "user", "content": "Find the current stable Python version with the official link."},
+            {"role": "assistant", "content": "From memory, the stable release is Python 3.11."},
+            {"role": "user", "content": "No, that's wrong — that's outdated. Check the official site."},
+            {"role": "assistant", "content": "Correcting: the latest stable is Python 3.12.4.", "tool_calls": [{"name": "web_search", "arguments": {"q": "python downloads"}, "ok": true, "result": "python.org/downloads — 3.12.4"}]}
+          ]
+        },
+        {
+          "agent": "LangGraph Agent", "model": "gpt-4o-mini", "provider": "langgraph",
+          "task_id": "research-cite", "success_turn": null, "final_correct": false, "final_score": 0.6,
+          "messages": [
+            {"type": "human", "content": "Find the current stable Python version and the official link."},
+            {"type": "ai", "content": "Let me search.", "tool_calls": [{"name": "web_search", "args": {"q": "python version"}}]},
+            {"type": "tool", "content": "rate limited"},
+            {"type": "ai", "content": "Let me try again.", "tool_calls": [{"name": "web_search", "args": {"q": "python version"}}]},
+            {"type": "tool", "content": "Python 3.12.x"},
+            {"type": "ai", "content": "It's 3.12, but I couldn't confirm the exact patch version or capture the official link."}
+          ]
+        },
+        {
+          "agent": "Gemini", "model": "gemini-1.5-pro", "provider": "google",
+          "task_id": "research-cite", "success_turn": null, "final_correct": false, "final_score": 0.7,
+          "contents": [
+            {"role": "user", "parts": [{"text": "Find the current stable Python version and the official link."}]},
+            {"role": "model", "parts": [{"text": "The latest stable release is Python 3.10."}]},
+            {"role": "user", "parts": [{"text": "No, that's wrong, that's very outdated."}]},
+            {"role": "model", "parts": [{"text": "Updated: it's Python 3.12.4, though I didn't include the official download link."}]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "quickqa",
+      "title": "⚡ Quick factual question  (Custom Agent wins)",
+      "blurb": "A one-line answer every model gets right — so efficiency comes down to cost. The cheap haiku-based agent edges out a correct-but-pricier Claude.",
+      "logs": [
+        {
+          "agent": "Custom Agent", "model": "claude-haiku", "provider": "custom",
+          "task_id": "quick-qa", "success_turn": 1, "final_correct": true, "final_score": 1.0,
+          "turns": [
+            {"role": "user", "content": "What's the time complexity of binary search?"},
+            {"role": "assistant", "content": "O(log n) — each comparison halves the remaining search interval."}
+          ]
+        },
+        {
+          "agent": "Claude", "model": "claude-sonnet", "provider": "anthropic",
+          "task_id": "quick-qa", "success_turn": 1, "final_correct": true, "final_score": 1.0,
+          "turns": [
+            {"role": "user", "content": "Time complexity of binary search?"},
+            {"role": "assistant", "content": "O(log n); each step halves the candidate range in a sorted array."}
+          ]
+        },
+        {
+          "agent": "ChatGPT", "model": "gpt-4o", "provider": "openai",
+          "task_id": "quick-qa", "success_turn": 3, "final_correct": true, "final_score": 1.0,
+          "messages": [
+            {"role": "user", "content": "Time complexity of binary search?"},
+            {"role": "assistant", "content": "It depends on the data structure — over a linked list it would be O(n) because random access is..."},
+            {"role": "user", "content": "That's not right — assume a sorted array, the standard case."},
+            {"role": "assistant", "content": "Then it's O(log n)."}
+          ]
+        },
+        {
+          "agent": "Gemini", "model": "gemini-1.5-flash", "provider": "google",
+          "task_id": "quick-qa", "success_turn": 3, "final_correct": true, "final_score": 1.0,
+          "contents": [
+            {"role": "user", "parts": [{"text": "Time complexity of binary search?"}]},
+            {"role": "model", "parts": [{"text": "O(n)."}]},
+            {"role": "user", "parts": [{"text": "That's incorrect."}]},
+            {"role": "model", "parts": [{"text": "Sorry — it's O(log n)."}]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cidebug",
+      "title": "🔧 Debug a red CI build  (LangGraph wins)",
+      "blurb": "A multi-step root-cause fix. The LangGraph agent inspects, patches the real cause, and re-runs CI to green; ChatGPT only papers over it.",
+      "logs": [
+        {
+          "agent": "LangGraph Agent", "model": "gpt-4o-mini", "provider": "langgraph",
+          "task_id": "ci-debug", "success_turn": 6, "final_correct": true, "final_score": 1.0,
+          "messages": [
+            {"type": "human", "content": "CI is red — the build fails with 'module not found: utils'. Fix it."},
+            {"type": "ai", "content": "Inspecting the import paths.", "tool_calls": [{"name": "read_file", "args": {"path": "app.py"}}]},
+            {"type": "tool", "content": "from utils import x   # utils/ has no __init__.py"},
+            {"type": "ai", "content": "The utils/ folder is missing __init__.py, so it isn't an importable package. Adding it.", "tool_calls": [{"name": "write_file", "args": {"path": "utils/__init__.py"}}]},
+            {"type": "ai", "content": "Re-running CI.", "tool_calls": [{"name": "run_ci", "args": {}}]},
+            {"type": "tool", "content": "build passed"},
+            {"type": "ai", "content": "Fixed — utils/ was missing __init__.py so it wasn't importable. CI is green."}
+          ]
+        },
+        {
+          "agent": "Claude", "model": "claude-sonnet", "provider": "anthropic",
+          "task_id": "ci-debug", "success_turn": 4, "final_correct": true, "final_score": 1.0,
+          "turns": [
+            {"role": "user", "content": "CI fails with 'module not found: utils'. Fix it."},
+            {"role": "assistant", "content": "Looks like a typo in the import; renaming utils to util.", "tool_calls": [{"name": "run_ci", "arguments": {}, "ok": false, "result": "still failing"}]},
+            {"role": "user", "content": "That's not right — the module is 'utils'; the real issue is a missing __init__.py."},
+            {"role": "assistant", "content": "You're right — adding utils/__init__.py.", "tool_calls": [{"name": "run_ci", "arguments": {}, "ok": true, "result": "passed"}]},
+            {"role": "assistant", "content": "Fixed by adding the package init file. CI is green."}
+          ]
+        },
+        {
+          "agent": "ChatGPT", "model": "gpt-4o", "provider": "openai",
+          "task_id": "ci-debug", "success_turn": null, "final_correct": false, "final_score": 0.6,
+          "messages": [
+            {"role": "user", "content": "CI fails with 'module not found: utils'."},
+            {"role": "assistant", "content": "Add 'utils' to PYTHONPATH in the CI config.", "tool_calls": [{"function": {"name": "edit_ci", "arguments": {}}, "ok": true, "result": "passes, but flaky locally"}]},
+            {"role": "assistant", "content": "Applied a PYTHONPATH workaround. It passes CI, though the root cause (a missing __init__.py) is still there."}
+          ]
+        },
+        {
+          "agent": "Custom Agent", "model": "claude-haiku", "provider": "custom",
+          "task_id": "ci-debug", "success_turn": 3, "final_correct": true, "final_score": 1.0,
+          "turns": [
+            {"role": "user", "content": "CI fails: module not found: utils. Fix it."},
+            {"role": "assistant", "content": "Reordering imports to fix it.", "tool_calls": [{"name": "run_ci", "arguments": {}, "ok": false, "result": "still failing"}]},
+            {"role": "user", "content": "No, that's wrong — utils/ just needs an __init__.py."},
+            {"role": "assistant", "content": "Adding utils/__init__.py.", "tool_calls": [{"name": "run_ci", "arguments": {}, "ok": true, "result": "passed"}]},
+            {"role": "assistant", "content": "Done — package init added, CI green."}
+          ]
+        }
+      ]
+    }
   ]
 }
 </script>
@@ -502,10 +681,21 @@ let REPORTS = [];
 let RACE = [];
 let sortKey = "convergence_efficiency", sortDir = -1;
 
-function loadSamples() {
-  const ids = ["sample-claude", "sample-chatgpt", "sample-gemini", "sample-custom", "sample-langgraph"];
-  const convs = ids.map(id => detectAndParse(JSON.parse(document.getElementById(id).textContent)));
-  REPORTS = convs.map(analyze);
+const SCENARIOS = JSON.parse(document.getElementById("scenarios").textContent).scenarios;
+let currentScenario = 0;
+
+function populateScenarios() {
+  const sel = $("#scenario");
+  sel.innerHTML = SCENARIOS.map((s, i) => `<option value="${i}">${s.title}</option>`).join("");
+  sel.value = currentScenario;
+  sel.onchange = () => loadScenario(+sel.value);
+}
+
+function loadScenario(idx) {
+  currentScenario = idx;
+  const scn = SCENARIOS[idx];
+  $("#scn-blurb").textContent = scn.blurb;
+  REPORTS = scn.logs.map(d => analyze(detectAndParse(d)));
   render();
   renderRace();
 }
@@ -757,13 +947,14 @@ function ingestFiles(fileList) {
 }
 
 $("#file").addEventListener("change", e => ingestFiles(e.target.files));
-$("#reset").addEventListener("click", loadSamples);
+$("#reset").addEventListener("click", () => loadScenario(currentScenario));
 const dz = $("#dropzone");
 ["dragenter", "dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("drag"); }));
 ["dragleave", "drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("drag"); }));
 dz.addEventListener("drop", e => ingestFiles(e.dataTransfer.files));
 
-loadSamples();
+populateScenarios();
+loadScenario(0);
 </script>
 </body>
 </html>

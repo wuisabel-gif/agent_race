@@ -26,6 +26,17 @@ browser. Just open the file (double-click, or `open index.html`); nothing is
 uploaded anywhere. It ships with the same five sample logs, auto-detects
 formats, and supports drag-and-drop of your own conversation JSON.
 
+It ships with **five short example workloads**, each won by a different agent, so
+no single system looks artificially dominant — pick one from the dropdown:
+
+| Example | Winner | Why |
+| --- | --- | --- |
+| Fix a failing unit test | Claude | clean one-pass fix; others need a correction |
+| Summarize a 40-page contract | Gemini | long-context, one shot, pennies |
+| Web research with a citation | ChatGPT | searches and cites instead of guessing |
+| Quick factual question | Custom Agent | everyone's right, so cheapest wins |
+| Debug a red CI build | LangGraph | finds the real root cause, not a workaround |
+
 It renders:
 
 - an animated **race** where each agent is a car whose speed is its convergence
