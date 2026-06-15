@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AgentTraceLab — compare agentic LLM workloads</title>
+<style>
+  :root {
+    --bg: #0b0f17;
+    --panel: #131a26;
+    --panel-2: #182230;
+    --border: #243044;
+    --text: #e6edf6;
+    --muted: #8a99ad;
+    --accent: #5b9dff;
+    --accent-2: #7c5cff;
+    --good: #36d399;
+    --warn: #fbbd23;
+    --bad: #f87272;
+    --bar: #2a3a55;
+    font-synthesis: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 80% -10%, #16213a 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 22px 80px; }
+  header.hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .title { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+  .title .flag { margin-right: 8px; }
+  .tag { color: var(--muted); margin: 6px 0 0; max-width: 640px; }
+  .pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .pill { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; background: var(--panel); }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn {
+    background: linear-gradient(180deg, var(--accent), #3f7be0);
+    color: white; border: none; border-radius: 9px; padding: 9px 15px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .btn.ghost { background: var(--panel); color: var(--text); border: 1px solid var(--border); }
+  .btn:hover { filter: brightness(1.08); }
+  .hint { font-size: 12px; color: var(--muted); }
+
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 26px 0; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+  .card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .card .value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+  .card .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  section { margin-top: 30px; }
+  h2 { font-size: 16px; font-weight: 650; margin: 0 0 12px; letter-spacing: -0.01em; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 6px; overflow: hidden; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: right; padding: 10px 12px; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; position: sticky; left: 0; }
+  thead th { color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+  thead th:hover { color: var(--text); }
+  tbody tr { border-bottom: 1px solid rgba(36,48,68,.5); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--panel-2); }
+  .agent-cell { font-weight: 650; }
+  .rank { display: inline-block; width: 20px; color: var(--muted); }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+  .badge.ok { background: rgba(54,211,153,.14); color: var(--good); }
+  .badge.partial { background: rgba(251,189,35,.14); color: var(--warn); }
+  .badge.fail { background: rgba(248,114,114,.14); color: var(--bad); }
+  .table-scroll { overflow-x: auto; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .chart { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+  .chart h3 { font-size: 13px; margin: 0 0 14px; color: var(--muted); font-weight: 600; }
+  .barrow { display: grid; grid-template-columns: 120px 1fr 78px; align-items: center; gap: 10px; margin: 9px 0; font-size: 12px; }
+  .barrow .name { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+  .bartrack { background: var(--bar); border-radius: 6px; height: 14px; overflow: hidden; }
+  .barfill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+  .barval { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+  .trace-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 13px; }
+  .role { font-size: 11px; padding: 1px 7px; border-radius: 5px; background: var(--panel-2); color: var(--muted); }
+  .role.assistant { color: var(--accent); }
+  .role.user { color: var(--good); }
+  .role.tool { color: var(--warn); }
+  .flag-chip { font-size: 11px; padding: 1px 6px; border-radius: 5px; margin-left: 4px; }
+  .flag-chip.retry { background: rgba(248,114,114,.14); color: var(--bad); }
+  .flag-chip.fix { background: rgba(251,189,35,.14); color: var(--warn); }
+
+  .footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); padding-top: 18px; }
+  code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+  .dropzone { border: 1px dashed var(--border); border-radius: 10px; padding: 10px 14px; font-size: 12px; color: var(--muted); }
+  .dropzone.drag { border-color: var(--accent); color: var(--text); background: var(--panel-2); }
+  @media (max-width: 860px) {
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <h1 class="title"><span class="flag">🏁</span>AgentTraceLab</h1>
+      <p class="tag">Compare how different AI agents solve the <em>same task</em> — converting multi-turn conversations into structured traffic traces, then measuring cost, speed, tool use, retries, and convergence efficiency.</p>
+      <div class="pills">
+        <span class="pill">ChatGPT</span><span class="pill">Gemini</span><span class="pill">Claude</span>
+        <span class="pill">OpenAI Agents SDK</span><span class="pill">LangGraph</span><span class="pill">Custom</span>
+      </div>
+    </div>
+    <div class="controls">
+      <label class="btn" for="file">Upload logs</label>
+      <input id="file" type="file" accept=".json" multiple hidden />
+      <button class="btn ghost" id="reset">Reset to samples</button>
+    </div>
+  </header>
+
+  <div id="dropzone" class="dropzone" style="margin-top:16px;">Drag &amp; drop conversation JSON here, or use <strong>Upload logs</strong>. Formats auto-detect: native · OpenAI/ChatGPT · Gemini · LangGraph.</div>
+
+  <div class="cards" id="cards"></div>
+
+  <section>
+    <h2>Comparison <span class="hint">— click a column to sort</span></h2>
+    <div class="panel table-scroll"><table id="table"></table></div>
+  </section>
+
+  <section>
+    <h2>Workload charts</h2>
+    <div class="grid2">
+      <div class="chart"><h3>Estimated cost (USD)</h3><div id="chart-cost"></div></div>
+      <div class="chart"><h3>Estimated latency (seconds)</h3><div id="chart-latency"></div></div>
+      <div class="chart"><h3>Convergence efficiency (0–1)</h3><div id="chart-eff"></div></div>
+      <div class="chart"><h3>Tokens to first correct answer</h3><div id="chart-tts"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Per-turn traffic trace</h2>
+    <div class="trace-head">
+      <select id="agent-select"></select>
+      <span class="hint">Cumulative cost as the context window grows turn over turn.</span>
+    </div>
+    <div class="chart" style="margin-bottom:14px;"><div id="trace-chart"></div></div>
+    <div class="panel table-scroll"><table id="trace-table"></table></div>
+  </section>
+
+  <div class="footer">
+    Pure client-side demo — token, cost, and latency models run in your browser, no data leaves the page.
+    Prices are approximate public list rates for relative comparison, not billing. Pairs with the Python
+    package: <code>agenttracelab analyze data/samples</code>.
+  </div>
+</div>
+
+<!-- ===== Embedded sample logs (one per supported format) ===== -->
+<script type="application/json" id="sample-claude">
+{
+  "agent": "Claude", "model": "claude-sonnet", "provider": "anthropic",
+  "task_id": "fix-parse-duration", "success_turn": 4, "final_correct": true, "final_score": 1.0,
+  "turns": [
+    {"role": "user", "content": "The test for parse_duration() is failing. It should turn strings like '1h30m' and '45s' into seconds. Here is the current code and the failing test output. Please fix it."},
+    {"role": "assistant", "content": "Let me look at the function and the test to understand the gap. I'll read the source first.", "tool_calls": [{"name": "read_file", "arguments": {"path": "durations.py"}, "ok": true, "result": "def parse_duration(s): return int(s)"}]},
+    {"role": "assistant", "content": "The current implementation just calls int(s), so any unit suffix raises a ValueError. I'll rewrite it to parse hours, minutes, and seconds with a regex and sum them.", "tool_calls": [{"name": "write_file", "arguments": {"path": "durations.py", "content": "import re\nUNITS={'h':3600,'m':60,'s':1}\ndef parse_duration(s):\n    total=0\n    for value,unit in re.findall(r'(\\d+)([hms])', s):\n        total+=int(value)*UNITS[unit]\n    return total"}, "ok": true}]},
+    {"role": "assistant", "content": "Now I'll run the test suite to confirm the fix.", "tool_calls": [{"name": "run_tests", "arguments": {"path": "test_durations.py"}, "ok": true, "result": "5 passed in 0.03s"}]},
+    {"role": "assistant", "content": "All 5 tests pass. parse_duration now handles combined units like '1h30m' (5400s) and single units like '45s'. The fix uses a regex to extract each value/unit pair and sums them against a units table."}
+  ]
+}
+</script>
+<script type="application/json" id="sample-chatgpt">
+{
+  "agent": "ChatGPT", "model": "gpt-4o", "provider": "openai",
+  "task_id": "fix-parse-duration", "success_turn": 4, "final_correct": true, "final_score": 1.0,
+  "messages": [
+    {"role": "system", "content": "You are a coding assistant with access to a Python tool runner."},
+    {"role": "user", "content": "parse_duration() is failing. It should convert '1h30m', '45s', etc. into total seconds. Fix it."},
+    {"role": "assistant", "content": "I'll write a regex-based parser that maps h/m/s to seconds and run it.", "tool_calls": [{"function": {"name": "python", "arguments": "{\"code\": \"import re\\nUNITS={'h':3600,'m':60,'s':1}\\ndef parse_duration(s):\\n    return sum(int(v)*UNITS[u] for v,u in re.findall(r'(\\\\d+)([hms])', s))\\nprint(parse_duration('1h30m'), parse_duration('45s'))\"}"}, "ok": true, "result": "5400 45"}]},
+    {"role": "tool", "content": "5400 45"},
+    {"role": "assistant", "content": "The parser returns 5400 for '1h30m' and 45 for '45s', which matches the expected values. Here is the final implementation using re.findall over each value/unit pair."}
+  ]
+}
+</script>
+<script type="application/json" id="sample-gemini">
+{
+  "agent": "Gemini", "model": "gemini-1.5-pro", "provider": "google",
+  "task_id": "fix-parse-duration", "success_turn": null, "final_correct": false, "final_score": 0.6,
+  "contents": [
+    {"role": "user", "parts": [{"text": "parse_duration() is failing. It should convert strings like '1h30m' and '45s' into total seconds. Please fix the function."}]},
+    {"role": "model", "parts": [{"text": "I'll split the string on the letter 'm' and convert each side to a number."}]},
+    {"role": "model", "parts": [{"text": "Running my first attempt."}, {"functionCall": {"name": "run_code", "args": {"code": "def parse_duration(s): h,m=s.split('m'); return int(h)*60+int(m)"}}}, {"functionResponse": {"name": "run_code", "response": "ValueError: invalid literal for int() with base 10: '1h30'"}}]},
+    {"role": "user", "parts": [{"text": "No, that's wrong. It crashes on '1h30m' and ignores seconds entirely. Try again."}]},
+    {"role": "model", "parts": [{"text": "Sorry about that, my mistake. Let me handle hours and minutes separately."}]},
+    {"role": "model", "parts": [{"functionCall": {"name": "run_code", "args": {"code": "def parse_duration(s): return int(s.replace('h','*3600+').replace('m','*60+').replace('s','')[:-1])"}}}, {"functionResponse": {"name": "run_code", "response": "SyntaxError: invalid expression"}}]},
+    {"role": "user", "parts": [{"text": "Still failing. That string-replace approach doesn't evaluate the arithmetic. Use a proper parser."}]},
+    {"role": "model", "parts": [{"text": "Let me try again with a regex over hours and minutes."}]},
+    {"role": "model", "parts": [{"functionCall": {"name": "run_code", "args": {"code": "import re\ndef parse_duration(s):\n    h=re.search(r'(\\d+)h', s); m=re.search(r'(\\d+)m', s)\n    return (int(h.group(1)) if h else 0)*3600 + (int(m.group(1)) if m else 0)*60"}}}, {"functionResponse": {"name": "run_code", "response": "parse_duration('1h30m')=5400 OK; parse_duration('45s')=0 FAIL"}}]},
+    {"role": "user", "parts": [{"text": "Closer, but '45s' returns 0 because you never handle seconds."}]},
+    {"role": "model", "parts": [{"text": "I've added hours and minutes handling. Seconds support is still incomplete, but the common '1h30m' case now works. This is a partial fix."}]}
+  ]
+}
+</script>
+<script type="application/json" id="sample-custom">
+{
+  "agent": "Custom Agent", "model": "claude-haiku", "provider": "custom",
+  "task_id": "fix-parse-duration", "success_turn": 2, "final_correct": true, "final_score": 0.95,
+  "turns": [
+    {"role": "user", "content": "Fix parse_duration() so '1h30m', '45s', '2h', etc. convert to total seconds."},
+    {"role": "assistant", "content": "Regex over each value/unit pair, summed against a units table.", "tool_calls": [{"name": "apply_patch", "arguments": {"path": "durations.py", "diff": "+import re\n+UNITS={'h':3600,'m':60,'s':1}\n+def parse_duration(s):\n+    return sum(int(v)*UNITS[u] for v,u in re.findall(r'(\\d+)([hms])', s))"}, "ok": true}, {"name": "run_tests", "arguments": {"path": "test_durations.py"}, "ok": true, "result": "5 passed"}]},
+    {"role": "assistant", "content": "Done — all 5 tests pass. Single tool-augmented turn: patch applied and verified."}
+  ]
+}
+</script>
+<script type="application/json" id="sample-langgraph">
+{
+  "agent": "LangGraph Agent", "model": "gpt-4o-mini", "provider": "langgraph",
+  "task_id": "fix-parse-duration", "success_turn": 5, "final_correct": true, "final_score": 0.9,
+  "messages": [
+    {"type": "human", "content": "parse_duration() needs to handle '1h30m', '45s', '2h15m10s'. Fix and verify."},
+    {"type": "ai", "content": "Planning: read the file, write a regex parser, run tests.", "tool_calls": [{"name": "read_file", "args": {"path": "durations.py"}}]},
+    {"type": "tool", "content": "def parse_duration(s): return int(s)"},
+    {"type": "ai", "content": "Replacing with a regex-based summation over h/m/s units.", "tool_calls": [{"name": "write_file", "args": {"path": "durations.py", "content": "import re\nUNITS={'h':3600,'m':60,'s':1}\ndef parse_duration(s):\n    return sum(int(v)*UNITS[u] for v,u in re.findall(r'(\\d+)([hms])', s))"}}]},
+    {"type": "ai", "content": "Running the suite.", "tool_calls": [{"name": "run_tests", "args": {"path": "test_durations.py"}}]},
+    {"type": "tool", "content": "5 passed in 0.04s"},
+    {"type": "ai", "content": "All tests pass. parse_duration now sums each value/unit pair, so '2h15m10s' resolves to 8110 seconds."}
+  ]
+}
+</script>
+
+<script>
+/* ============================================================
+   AgentTraceLab — browser port of the Python analyzer.
+   Mirrors pricing.py / tokens.py / parsers / analyzer.py so the
+   demo matches the CLI output without a server.
+   ============================================================ */
+
+// ---- pricing.py ----
+const PRICES = {
+  "claude-opus":     {in: 15.0, out: 75.0, tps: 45},
+  "claude-sonnet":   {in: 3.0,  out: 15.0, tps: 65},
+  "claude-haiku":    {in: 0.80, out: 4.0,  tps: 120},
+  "gpt-4o":          {in: 2.5,  out: 10.0, tps: 80},
+  "gpt-4o-mini":     {in: 0.15, out: 0.60, tps: 130},
+  "o3":              {in: 10.0, out: 40.0, tps: 40},
+  "gemini-1.5-pro":  {in: 1.25, out: 5.0,  tps: 70},
+  "gemini-1.5-flash":{in: 0.075,out: 0.30, tps: 150},
+  "gemini-2.0-flash":{in: 0.10, out: 0.40, tps: 160},
+};
+const GENERIC_PRICE = {in: 2.0, out: 8.0, tps: 70};
+const TURN_OVERHEAD_MS = 350;
+
+function resolvePrice(model) {
+  if (!model) return GENERIC_PRICE;
+  const key = model.toLowerCase();
+  if (PRICES[key]) return PRICES[key];
+  for (const name in PRICES) if (name.includes(key) || key.includes(name)) return PRICES[name];
+  return GENERIC_PRICE;
+}
+function costUsd(model, inTok, outTok) {
+  const p = resolvePrice(model);
+  return inTok / 1e6 * p.in + outTok / 1e6 * p.out;
+}
+function latencyMs(model, outTok) {
+  const p = resolvePrice(model);
+  return TURN_OVERHEAD_MS + (outTok / (p.tps || 60)) * 1000;
+}
+
+// ---- tokens.py (heuristic) ----
+function estTokens(text) {
+  if (!text) return 0;
+  return Math.max(1, Math.round(String(text).length / 4));
+}
+
+// ---- parsers/base.py ----
+const CORRECTION_RE = /\b(no,|nope|that'?s wrong|incorrect|not what i|try again|still (broken|failing|wrong)|doesn'?t work|that'?s not right|you (missed|forgot)|actually,|instead)\b/i;
+const RETRY_RE = /\b(let me try again|let me retry|apologies|sorry|my mistake|i'?ll fix|let me correct|that didn'?t work|let me re-?run)\b/i;
+
+const ROLE_MAP = {
+  user:"user", human:"user",
+  assistant:"assistant", ai:"assistant", model:"assistant", bot:"assistant",
+  tool:"tool", function:"tool", tool_result:"tool",
+  system:"system", developer:"system",
+};
+const normRole = r => ROLE_MAP[(r || "").toLowerCase()] || "assistant";
+
+function coerceText(content) {
+  if (content == null) return "";
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content.map(p =>
+    typeof p === "string" ? p : (p && (p.text || p.content) || "")).filter(Boolean).join("\n");
+  if (typeof content === "object") return String(content.text || content.content || "");
+  return String(content);
+}
+
+function mkTurn(i, role, content, opts = {}) {
+  const text = coerceText(content);
+  return {
+    index: i, role, content: text,
+    input_tokens: opts.input_tokens ?? null,
+    output_tokens: opts.output_tokens ?? null,
+    tool_calls: opts.tool_calls || [],
+    latency_ms: opts.latency_ms ?? null,
+    is_correction: role === "user" && CORRECTION_RE.test(text),
+    is_retry: role === "assistant" && RETRY_RE.test(text),
+  };
+}
+
+// ---- parsers (auto-detect + normalize) ----
+function parseNative(d, path) {
+  const turns = (d.turns || []).map((raw, i) => mkTurn(i, normRole(raw.role || "assistant"), raw.content, {
+    input_tokens: raw.input_tokens, output_tokens: raw.output_tokens,
+    tool_calls: (raw.tool_calls || []).map(tc => ({name: tc.name || "tool", arguments: tc.arguments || {}, ok: tc.ok !== false, result: tc.result ?? null})),
+  }));
+  return conv(d, turns, {agent: "Agent", format: "native", path});
+}
+function parseOpenAI(d, path) {
+  const turns = (d.messages || []).map((raw, i) => {
+    const calls = (raw.tool_calls || []).map(tc => {
+      const fn = tc.function || tc; let args = fn.arguments;
+      if (typeof args === "string") { try { args = JSON.parse(args); } catch { args = {_raw: args}; } }
+      return {name: fn.name || "tool", arguments: args || {}, ok: tc.ok !== false, result: tc.result ?? null};
+    });
+    return mkTurn(i, normRole(raw.role || "assistant"), raw.content, {input_tokens: raw.input_tokens, output_tokens: raw.output_tokens, tool_calls: calls});
+  });
+  return conv(d, turns, {agent: "ChatGPT", model: "gpt-4o", format: "openai_chat", path});
+}
+function parseGemini(d, path) {
+  const turns = (d.contents || []).map((raw, i) => {
+    const texts = [], calls = [];
+    for (const part of (raw.parts || [])) {
+      if (part == null) continue;
+      if (typeof part === "string") { texts.push(part); continue; }
+      if ("text" in part) texts.push(part.text);
+      if ("functionCall" in part) { const fc = part.functionCall || {}; calls.push({name: fc.name || "tool", arguments: fc.args || {}, ok: true, result: null}); }
+      if ("functionResponse" in part && calls.length) calls[calls.length - 1].result = String((part.functionResponse || {}).response || "");
+    }
+    return mkTurn(i, normRole(raw.role || "model"), texts.filter(Boolean).join("\n"), {tool_calls: calls});
+  });
+  return conv(d, turns, {agent: "Gemini", model: "gemini-1.5-pro", format: "gemini", path});
+}
+function parseLangGraph(d, path) {
+  const turns = (d.messages || []).map((raw, i) => mkTurn(i, normRole(raw.type || "ai"), raw.content, {
+    tool_calls: (raw.tool_calls || []).map(tc => ({name: tc.name || "tool", arguments: tc.args || tc.arguments || {}, ok: true, result: null})),
+  }));
+  return conv(d, turns, {agent: "LangGraph Agent", format: "langgraph", path});
+}
+function conv(d, turns, def) {
+  return {
+    agent: d.agent || def.agent, turns,
+    task_id: d.task_id || "task", model: d.model || def.model || null, provider: d.provider || null,
+    success_turn: d.success_turn ?? null, final_correct: !!d.final_correct, final_score: +(d.final_score || 0),
+    source_format: def.format, source_path: def.path || null,
+  };
+}
+function detectAndParse(d, path) {
+  if (d && Array.isArray(d.turns)) return parseNative(d, path);
+  if (d && Array.isArray(d.messages) && d.messages[0] && ("type" in d.messages[0]) && !("role" in d.messages[0])) return parseLangGraph(d, path);
+  if (d && Array.isArray(d.messages) && d.messages[0] && ("role" in d.messages[0])) return parseOpenAI(d, path);
+  if (d && Array.isArray(d.contents) && d.contents[0] && ("parts" in d.contents[0])) return parseGemini(d, path);
+  throw new Error("Unrecognized log format: " + (path || "uploaded file"));
+}
+
+// ---- analyzer.py ----
+function turnOutputTokens(t) {
+  if (t.output_tokens != null) return t.output_tokens;
+  let total = estTokens(t.content);
+  for (const c of t.tool_calls) total += estTokens(c.name) + estTokens(JSON.stringify(c.arguments));
+  return total;
+}
+function turnContextTokens(t) {
+  let total = estTokens(t.content);
+  for (const c of t.tool_calls) {
+    total += estTokens(c.name) + estTokens(JSON.stringify(c.arguments));
+    if (c.result) total += estTokens(String(c.result));
+  }
+  return total;
+}
+function buildTrace(c) {
+  const rows = []; let ctx = 0, cum = 0;
+  for (const t of c.turns) {
+    const toolCalls = t.tool_calls.length;
+    const toolFails = t.tool_calls.filter(x => x.ok === false).length;
+    let inTok = 0, outTok = 0, cost = 0, lat = 0;
+    if (t.role === "assistant") {
+      inTok = t.input_tokens != null ? t.input_tokens : ctx;
+      outTok = turnOutputTokens(t);
+      cost = costUsd(c.model, inTok, outTok);
+      lat = t.latency_ms != null ? t.latency_ms : latencyMs(c.model, outTok);
+    }
+    cum += cost;
+    rows.push({turn_index: t.index, role: t.role, input_tokens: inTok, output_tokens: outTok,
+      tool_calls: toolCalls, tool_failures: toolFails, latency_ms: Math.round(lat * 10) / 10,
+      cost_usd: cost, cumulative_cost_usd: cum, is_retry: t.is_retry, is_correction: t.is_correction});
+    ctx += turnContextTokens(t);
+  }
+  return rows;
+}
+function convergenceEfficiency(finalScore, converged, tts, totalTok, corrections) {
+  if (!converged || finalScore <= 0) return 0;
+  const denom = tts || totalTok || 1;
+  const budget = Math.min(1, 4000 / denom);
+  const penalty = 1 / (1 + corrections);
+  return Math.round(finalScore * budget * penalty * 1e4) / 1e4;
+}
+function analyze(c) {
+  const trace = buildTrace(c);
+  const inTok = trace.reduce((s, r) => s + r.input_tokens, 0);
+  const outTok = trace.reduce((s, r) => s + r.output_tokens, 0);
+  const cost = trace.reduce((s, r) => s + r.cost_usd, 0);
+  const lat = trace.reduce((s, r) => s + r.latency_ms, 0);
+  const tcalls = trace.reduce((s, r) => s + r.tool_calls, 0);
+  const tfails = trace.reduce((s, r) => s + r.tool_failures, 0);
+  const toolOk = tcalls === 0 ? 1 : 1 - tfails / tcalls;
+  const retries = trace.filter(r => r.is_retry).length;
+  const fixes = trace.filter(r => r.is_correction).length;
+  let tts = null, turnsToSuccess = null;
+  if (c.success_turn != null) {
+    const upto = trace.filter(r => r.turn_index <= c.success_turn);
+    tts = upto.reduce((s, r) => s + r.input_tokens + r.output_tokens, 0);
+    turnsToSuccess = upto.filter(r => r.role === "assistant").length;
+  }
+  const converged = c.success_turn != null;
+  return {
+    agent: c.agent, task_id: c.task_id, model: c.model, provider: c.provider,
+    turn_count: c.turns.length, assistant_turns: c.turns.filter(t => t.role === "assistant").length,
+    input_tokens: inTok, output_tokens: outTok, total_tokens: inTok + outTok,
+    tool_calls: tcalls, tool_success_rate: Math.round(toolOk * 1e4) / 1e4,
+    retry_loops: retries, correction_count: fixes,
+    latency_estimate_ms: Math.round(lat * 10) / 10, cost_estimate_usd: cost,
+    success_turn: c.success_turn, turns_to_success: turnsToSuccess, tokens_to_success: tts,
+    final_correct: c.final_correct, final_score: c.final_score,
+    convergence_efficiency: convergenceEfficiency(c.final_score, converged, tts, inTok + outTok, fixes),
+    trace,
+  };
+}
+function rankReports(rs) {
+  return rs.slice().sort((a, b) =>
+    (b.convergence_efficiency - a.convergence_efficiency) ||
+    (a.cost_estimate_usd - b.cost_estimate_usd) ||
+    (a.latency_estimate_ms - b.latency_estimate_ms));
+}
+
+/* ============================ UI ============================ */
+const $ = s => document.querySelector(s);
+let REPORTS = [];
+let sortKey = "convergence_efficiency", sortDir = -1;
+
+function loadSamples() {
+  const ids = ["sample-claude", "sample-chatgpt", "sample-gemini", "sample-custom", "sample-langgraph"];
+  const convs = ids.map(id => detectAndParse(JSON.parse(document.getElementById(id).textContent)));
+  REPORTS = convs.map(analyze);
+  render();
+}
+
+const COLS = [
+  {h: "Agent", k: "agent", t: "text"},
+  {h: "Model", k: "model", f: v => v || "-"},
+  {h: "Turns", k: "turn_count"},
+  {h: "→Success", k: "turns_to_success", f: v => v == null ? "-" : v},
+  {h: "In tok", k: "input_tokens", f: v => v.toLocaleString()},
+  {h: "Out tok", k: "output_tokens", f: v => v.toLocaleString()},
+  {h: "Tools", k: "tool_calls"},
+  {h: "Tool OK", k: "tool_success_rate", f: v => Math.round(v * 100) + "%"},
+  {h: "Retries", k: "retry_loops"},
+  {h: "Fixes", k: "correction_count"},
+  {h: "Latency", k: "latency_estimate_ms", f: v => (v / 1000).toFixed(1) + "s"},
+  {h: "Cost", k: "cost_estimate_usd", f: v => "$" + v.toFixed(4)},
+  {h: "Result", k: "_result", t: "result"},
+  {h: "Efficiency", k: "convergence_efficiency", f: v => v.toFixed(3)},
+];
+
+function resultBadge(r) {
+  if (r.final_correct) return '<span class="badge ok">correct</span>';
+  if (r.final_score > 0) return '<span class="badge partial">partial</span>';
+  return '<span class="badge fail">failed</span>';
+}
+
+function render() {
+  const ranked = REPORTS.slice().sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    let primary;
+    if (av == null && bv == null) primary = 0;
+    else if (av == null) primary = 1;
+    else if (bv == null) primary = -1;
+    else if (typeof av === "string") primary = sortDir * av.localeCompare(bv);
+    else primary = sortDir * (av - bv);
+    if (primary !== 0) return primary;
+    // Stable tie-break matching the "most efficient" ranking: cost, then latency.
+    return (a.cost_estimate_usd - b.cost_estimate_usd) ||
+           (a.latency_estimate_ms - b.latency_estimate_ms);
+  });
+  renderCards();
+  renderTable(ranked);
+  renderCharts();
+  renderTraceSelect();
+}
+
+function renderCards() {
+  if (!REPORTS.length) { $("#cards").innerHTML = ""; return; }
+  const best = rankReports(REPORTS)[0];
+  const cheapest = REPORTS.reduce((a, b) => a.cost_estimate_usd <= b.cost_estimate_usd ? a : b);
+  const fastest = REPORTS.reduce((a, b) => a.latency_estimate_ms <= b.latency_estimate_ms ? a : b);
+  const cards = [
+    {label: "Agents compared", value: REPORTS.length, sub: "on task: " + REPORTS[0].task_id},
+    {label: "Most efficient", value: best.agent, sub: "efficiency " + best.convergence_efficiency.toFixed(3)},
+    {label: "Cheapest", value: cheapest.agent, sub: "$" + cheapest.cost_estimate_usd.toFixed(4)},
+    {label: "Fastest", value: fastest.agent, sub: (fastest.latency_estimate_ms / 1000).toFixed(1) + "s est."},
+  ];
+  $("#cards").innerHTML = cards.map(c =>
+    `<div class="card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`).join("");
+}
+
+function renderTable(rows) {
+  const head = "<thead><tr>" + COLS.map(c =>
+    `<th data-k="${c.k}">${c.h}${sortKey === c.k ? (sortDir < 0 ? " ▾" : " ▴") : ""}</th>`).join("") + "</tr></thead>";
+  const body = "<tbody>" + rows.map((r, i) => "<tr>" + COLS.map(c => {
+    if (c.t === "result") return `<td>${resultBadge(r)}</td>`;
+    let v = r[c.k];
+    if (c.t === "text") return `<td class="agent-cell"><span class="rank">${i + 1}</span>${v}</td>`;
+    v = c.f ? c.f(v) : v;
+    return `<td>${v}</td>`;
+  }).join("") + "</tr>").join("") + "</tbody>";
+  const table = $("#table");
+  table.innerHTML = head + body;
+  table.querySelectorAll("th").forEach(th => th.onclick = () => {
+    const k = th.dataset.k;
+    if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = (k === "agent") ? 1 : -1; }
+    render();
+  });
+}
+
+function bars(containerId, items, fmt) {
+  const max = Math.max(...items.map(i => i.value), 1e-9);
+  $(containerId).innerHTML = items.map(i => {
+    const pct = Math.max(2, (i.value / max) * 100);
+    return `<div class="barrow"><span class="name" title="${i.name}">${i.name}</span>` +
+      `<span class="bartrack"><span class="barfill" style="width:${pct}%"></span></span>` +
+      `<span class="barval">${fmt(i.value)}</span></div>`;
+  }).join("");
+}
+
+function renderCharts() {
+  const by = k => REPORTS.map(r => ({name: r.agent, value: r[k] || 0}));
+  bars("#chart-cost", by("cost_estimate_usd").sort((a,b)=>b.value-a.value), v => "$" + v.toFixed(4));
+  bars("#chart-latency", by("latency_estimate_ms").sort((a,b)=>b.value-a.value), v => (v/1000).toFixed(1) + "s");
+  bars("#chart-eff", by("convergence_efficiency").sort((a,b)=>b.value-a.value), v => v.toFixed(3));
+  bars("#chart-tts", REPORTS.map(r => ({name: r.agent, value: r.tokens_to_success || 0})).sort((a,b)=>b.value-a.value),
+    v => v ? v.toLocaleString() : "—");
+}
+
+function renderTraceSelect() {
+  const sel = $("#agent-select");
+  const cur = sel.value;
+  sel.innerHTML = REPORTS.map(r => `<option>${r.agent}</option>`).join("");
+  if (REPORTS.some(r => r.agent === cur)) sel.value = cur;
+  sel.onchange = renderTrace;
+  renderTrace();
+}
+
+function renderTrace() {
+  const rep = REPORTS.find(r => r.agent === $("#agent-select").value) || REPORTS[0];
+  if (!rep) return;
+  drawTraceChart(rep);
+  const head = "<thead><tr><th>#</th><th>Role</th><th>In tok</th><th>Out tok</th><th>Tools</th><th>Latency</th><th>Cost</th><th>Cumulative</th><th>Flags</th></tr></thead>";
+  const body = "<tbody>" + rep.trace.map(r => {
+    let flags = "";
+    if (r.is_retry) flags += '<span class="flag-chip retry">retry</span>';
+    if (r.is_correction) flags += '<span class="flag-chip fix">user fix</span>';
+    return `<tr><td>${r.turn_index}</td>` +
+      `<td><span class="role ${r.role}">${r.role}</span></td>` +
+      `<td>${r.input_tokens.toLocaleString()}</td><td>${r.output_tokens.toLocaleString()}</td>` +
+      `<td>${r.tool_calls || "-"}</td><td>${(r.latency_ms/1000).toFixed(2)}s</td>` +
+      `<td>$${r.cost_usd.toFixed(5)}</td><td>$${r.cumulative_cost_usd.toFixed(5)}</td>` +
+      `<td style="text-align:left">${flags || "<span class='hint'>—</span>"}</td></tr>`;
+  }).join("") + "</tbody>";
+  $("#trace-table").innerHTML = head + body;
+}
+
+function drawTraceChart(rep) {
+  const W = 760, H = 150, pad = 28;
+  const pts = rep.trace.map(r => ({x: r.turn_index, y: r.cumulative_cost_usd}));
+  const maxX = Math.max(...pts.map(p => p.x), 1), maxY = Math.max(...pts.map(p => p.y), 1e-9);
+  const sx = x => pad + (x / maxX) * (W - pad * 2);
+  const sy = y => H - pad - (y / maxY) * (H - pad * 2);
+  const line = pts.map((p, i) => (i ? "L" : "M") + sx(p.x).toFixed(1) + "," + sy(p.y).toFixed(1)).join(" ");
+  const area = `M${sx(0)},${sy(0)} ` + pts.map(p => "L" + sx(p.x).toFixed(1) + "," + sy(p.y).toFixed(1)).join(" ") + ` L${sx(maxX)},${sy(0)} Z`;
+  const dots = rep.trace.map(r => {
+    const cx = sx(r.turn_index), cy = sy(r.cumulative_cost_usd);
+    const color = r.is_correction ? "var(--warn)" : r.is_retry ? "var(--bad)" : "var(--accent)";
+    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="${color}"><title>turn ${r.turn_index} · $${r.cumulative_cost_usd.toFixed(5)}</title></circle>`;
+  }).join("");
+  $("#trace-chart").innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" style="display:block">
+      <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+      <path d="${area}" fill="url(#ag)"/>
+      <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+      ${dots}
+      <text x="${pad}" y="${H-6}" fill="var(--muted)" font-size="10">turn 0</text>
+      <text x="${W-pad}" y="${H-6}" fill="var(--muted)" font-size="10" text-anchor="end">turn ${maxX}</text>
+      <text x="6" y="${pad-10}" fill="var(--muted)" font-size="10">$${maxY.toFixed(4)}</text>
+    </svg>`;
+}
+
+/* ---- file upload / drag-drop ---- */
+function ingestFiles(fileList) {
+  const files = [...fileList];
+  if (!files.length) return;
+  let pending = files.length;
+  const newReports = [];
+  files.forEach(f => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        newReports.push(analyze(detectAndParse(data, f.name)));
+      } catch (e) {
+        alert("Could not parse " + f.name + ": " + e.message);
+      }
+      if (--pending === 0) {
+        if (newReports.length) { REPORTS = REPORTS.concat(newReports); render(); }
+      }
+    };
+    reader.readAsText(f);
+  });
+}
+
+$("#file").addEventListener("change", e => ingestFiles(e.target.files));
+$("#reset").addEventListener("click", loadSamples);
+const dz = $("#dropzone");
+["dragenter", "dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("drag"); }));
+["dragleave", "drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("drag"); }));
+dz.addEventListener("drop", e => ingestFiles(e.dataTransfer.files));
+
+loadSamples();
+</script>
+</body>
+</html>

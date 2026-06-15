@@ -18,6 +18,25 @@ LangGraph Agent  gpt-4o-mini    7      4         ...     ...      3      100%   
 Gemini           gemini-1.5-pro 11     -         ...     ...      3      100%     3        4      ...      $...     0.60   0.000
 ```
 
+## Browser demo
+
+[`index.html`](index.html) is a **self-contained, zero-dependency demo** — the
+token/cost/latency models are ported to JavaScript and run entirely in the
+browser. Just open the file (double-click, or `open index.html`); nothing is
+uploaded anywhere. It ships with the same five sample logs, auto-detects
+formats, and supports drag-and-drop of your own conversation JSON.
+
+It renders:
+
+- a ranked comparison table (click any column to re-sort),
+- summary cards (most efficient / cheapest / fastest agent),
+- bar charts for cost, latency, convergence efficiency, and tokens-to-success, and
+- a per-turn traffic-trace chart showing cumulative cost as the context window
+  grows, with retries and user corrections marked inline.
+
+Mirrors the Python CLI output, so it doubles as a quick visual of what
+`agenttracelab analyze` produces.
+
 ## Why this exists
 
 Agentic LLM workloads are bursty, multi-turn, and tool-heavy, which makes them
