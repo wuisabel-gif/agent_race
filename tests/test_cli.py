@@ -62,6 +62,54 @@ def test_calibrate_reports_cost_per_correct(capsys):
     assert "Calibration recommendation" in out
 
 
+def test_calibrate_reports_route_llm_style_cpt(tmp_path, capsys):
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    for task_id, weak_score, strong_score in [
+        ("easy", 1.0, 1.0),
+        ("medium", 0.5, 1.0),
+        ("hard", 0.0, 1.0),
+    ]:
+        for agent, model, score in [
+            ("CheapAgent", "gpt-4o-mini", weak_score),
+            ("StrongAgent", "gpt-4o", strong_score),
+        ]:
+            payload = {
+                "agent": agent,
+                "model": model,
+                "task_id": task_id,
+                "success_turn": 1 if score >= 1.0 else None,
+                "final_correct": score >= 1.0,
+                "final_score": score,
+                "turns": [
+                    {"role": "user", "content": f"solve {task_id}"},
+                    {"role": "assistant", "content": "answer", "latency_ms": 10},
+                ],
+            }
+            (logs / f"{agent}-{task_id}.json").write_text(
+                json.dumps(payload),
+                encoding="utf-8",
+            )
+
+    rc = main(
+        [
+            "calibrate",
+            str(logs),
+            "--weak-agent",
+            "CheapAgent",
+            "--strong-agent",
+            "StrongAgent",
+            "--target-pgr",
+            "0.8",
+        ]
+    )
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "RouteLLM-style calibration" in out
+    assert "Measured CPT(80%)" in out
+    assert "Strong-agent tasks:" in out
+
+
 def test_unknown_model_reports_na(tmp_path, capsys):
     # A log naming a model absent from the price book must render cost as n/a.
     src = json.loads((SAMPLES / "claude_native.json").read_text(encoding="utf-8"))

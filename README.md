@@ -130,6 +130,12 @@ tokenomist analyze data/samples
 # Turn prior runs into a measured routing recommendation
 tokenomist calibrate runs/fix-tests
 
+# Compute a RouteLLM-style strong/weak routing threshold from paired runs
+tokenomist calibrate runs/fix-tests \
+  --weak-agent "DeepSeek" \
+  --strong-agent "Claude Code" \
+  --target-pgr 0.8
+
 # Write a JSON report (add --with-trace to embed per-turn rows)
 tokenomist analyze data/samples --json reports.json
 
@@ -286,6 +292,24 @@ stronger agent. The headline number to watch is cost per correct solution.
 ```bash
 tokenomist calibrate runs/fix-tests
 ```
+
+Tokenomist also includes a direct adaptation of the RouteLLM paper's routing
+metrics. If you have paired runs where a cheap/weak agent and an expensive/strong
+agent both attempted the same `task_id` values, ask how often the strong agent
+would need to be called to recover a target share of the quality gap:
+
+```bash
+tokenomist calibrate runs/fix-tests \
+  --weak-agent "DeepSeek" \
+  --strong-agent "Claude Code" \
+  --target-pgr 0.8
+```
+
+That prints the measured `CPT(80%)`: the smallest share of calls sent to the
+strong agent that recovers about 80% of the score gap between the weak-only and
+strong-only baselines. In paper terms, this is a calibration-stage oracle rather
+than a trained router: it tells you whether a task family has enough cheap-agent
+headroom to justify building or using a live router.
 
 That makes Tokenomist a terminal decision layer: compare Codex vs Gemini vs
 Claude vs Zhipu/GLM vs DeepSeek vs Cursor on your actual task shape, then choose
