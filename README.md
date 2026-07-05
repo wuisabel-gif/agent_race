@@ -1,31 +1,35 @@
-# AgentTraceLab
+# Tokenomist
 
-[![CI](https://github.com/wuisabel-gif/agent_race/actions/workflows/ci.yml/badge.svg)](https://github.com/wuisabel-gif/agent_race/actions/workflows/ci.yml)
+[![CI](https://github.com/wuisabel-gif/tokenomist/actions/workflows/ci.yml/badge.svg)](https://github.com/wuisabel-gif/tokenomist/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Compare how different AI agents solve the same task — by cost, speed, accuracy, and reasoning efficiency.**
+**The token economist: measure what your AI agents actually spend — and what
+actually works — then pick the right agent for the job.**
 
-📊 **[Try the live browser demo →](https://wuisabel-gif.github.io/agent_race/)** &nbsp;·&nbsp; no install, runs entirely in your browser.
+Agents differ wildly in what they cost, how fast they converge, and how often
+they're *right*. Tokenomist turns that into numbers: run several agents on the
+same task (or import logs you already have), and get an apples-to-apples
+leaderboard of correctness, cost, latency, retries, and efficiency — including
+the number most comparisons skip, **cost per correct solution**.
+
+📊 **[Try the live browser demo →](https://wuisabel-gif.github.io/tokenomist/)** &nbsp;·&nbsp; no install, runs entirely in your browser.
 
 ```bash
 pip install -e .
-agenttracelab analyze data/samples
+tokenomist analyze data/samples
 ```
 
-AgentTraceLab converts multi-turn AI conversations (ChatGPT, Gemini, Claude, the
-OpenAI Agents SDK, LangGraph, or your own custom agent) into **structured traffic
-traces**, then analyzes latency, token cost, tool-call patterns, retries, and
-convergence behavior. It turns a pile of raw conversation logs into an
-apples-to-apples leaderboard of agent systems on the same task.
+Three ways to use it:
 
-There are two common ways to use the repo:
-
-1. **Analyze logs you already have.** Drop JSON exports into a folder and run
-   `agenttracelab analyze <folder>`.
+1. **Analyze logs you already have.** Drop ChatGPT, Gemini, Claude, OpenAI
+   Agents SDK, LangGraph, or native JSON exports into a folder and run
+   `tokenomist analyze <folder>`. Tokenomist reconstructs each run as a
+   structured traffic trace and ranks the agents.
 2. **Route one job through terminal agents.** Configure commands for Codex,
    Gemini, Claude, Zhipu/GLM, DeepSeek, Cursor, or any local agent CLI, then run
-   `agenttracelab route job.md --agents agents.json`.
+   `tokenomist route job.md --agents agents.json`. Every agent gets the same
+   job; you get a recommendation backed by measurements.
 3. **Generate measured benchmark logs.** Use `harness/run_agent.py` on a coding
    task with hidden pytest tests, then analyze the logs it writes. This is the
    path for reporting cost per *correct* solution.
@@ -71,17 +75,17 @@ It renders:
   grows, with retries and user corrections marked inline.
 
 Mirrors the Python CLI output, so it doubles as a quick visual of what
-`agenttracelab analyze` produces.
+`tokenomist analyze` produces.
 
 ## Why this exists
 
 Agentic LLM workloads are bursty, multi-turn, and tool-heavy, which makes them
-hard to reason about from raw logs. AgentTraceLab characterizes that workload:
-it reconstructs the growing context each assistant turn re-reads (so input
-tokens accumulate the way they really do against a stateless API), attributes
-cost and latency per turn, and surfaces the retry loops and user corrections
-that drive real-world inefficiency. The per-turn CSV trace is a ready-made input
-for a queueing model or datacenter simulator.
+hard to reason about from raw logs — and expensive to get wrong. Tokenomist
+does the accounting: it reconstructs the growing context each assistant turn
+re-reads (so input tokens accumulate the way they really do against a stateless
+API), attributes cost and latency per turn, and surfaces the retry loops and
+user corrections that drive real-world inefficiency. The per-turn CSV trace is
+a ready-made input for a queueing model or datacenter simulator.
 
 ## Metrics
 
@@ -111,8 +115,8 @@ deterministic ~4-chars/token heuristic.
 ### From source (for development)
 
 ```bash
-git clone https://github.com/wuisabel-gif/agent_race
-cd agent_race
+git clone https://github.com/wuisabel-gif/tokenomist
+cd tokenomist
 pip install -e ".[dev]"   # editable install with pytest + ruff
 pytest                    # run the test suite
 ```
@@ -121,28 +125,31 @@ pytest                    # run the test suite
 
 ```bash
 # Compare agents in a table
-agenttracelab analyze data/samples
+tokenomist analyze data/samples
+
+# Turn prior runs into a measured routing recommendation
+tokenomist calibrate runs/fix-tests
 
 # Write a JSON report (add --with-trace to embed per-turn rows)
-agenttracelab analyze data/samples --json reports.json
+tokenomist analyze data/samples --json reports.json
 
 # Export the per-turn traffic trace as CSV
-agenttracelab trace data/samples --csv traces.csv
+tokenomist trace data/samples --csv traces.csv
 
 # Use your own up-to-date price book instead of the bundled one
-agenttracelab analyze data/samples --prices my_prices.json
+tokenomist analyze data/samples --prices my_prices.json
 
 # Create a terminal-agent config, then run the same job through every agent
-agenttracelab init-agents --out agents.json
-agenttracelab route job.md --agents agents.json --out runs/job1
+tokenomist init-agents --out agents.json
+tokenomist route job.md --agents agents.json --out runs/job1
 
 # List supported log formats
-agenttracelab formats
+tokenomist formats
 ```
 
 ### Pricing
 
-Model prices live in [`src/agenttracelab/prices.json`](src/agenttracelab/prices.json),
+Model prices live in [`src/tokenomist/prices.json`](src/tokenomist/prices.json),
 not in code — each entry is a model *family* (a stable name prefix like
 `claude-sonnet-4-6`) plus input/output rates per million tokens, an optional
 cached-input rate, and a rough throughput for latency estimation. Lookup matches
@@ -155,7 +162,7 @@ bump `last_verified`) or pass `--prices` to keep them current.
 ### Dashboard
 
 ```bash
-streamlit run src/agenttracelab/dashboard.py
+streamlit run src/tokenomist/dashboard.py
 ```
 
 Upload logs or load the bundled samples to get the comparison table plus charts
@@ -164,8 +171,8 @@ for cost, latency, tokens-to-success, and convergence efficiency.
 ### Library
 
 ```python
-from agenttracelab import load_conversations, analyze_many
-from agenttracelab.report import rank_reports, render_table
+from tokenomist import load_conversations, analyze_many
+from tokenomist.report import rank_reports, render_table
 
 reports = rank_reports(analyze_many(load_conversations(["data/samples"])))
 print(render_table(reports))
@@ -174,11 +181,18 @@ print(render_table(reports))
 ## Route jobs through terminal agents
 
 This is the "which agent should I use?" workflow. You describe a job once, map
-each installed agent to a terminal command, and AgentTraceLab runs them all,
+each installed agent to a terminal command, and Tokenomist runs them all,
 captures native logs, analyzes the results, and prints a recommendation.
 
+The design borrows the practical lesson from model-routing systems like
+RouteLLM: do not send every request to the most expensive model by default.
+Instead, measure your own workload, find which cheaper agents are reliable for
+which task shapes, and reserve stronger agents for the cases where they are
+worth the extra cost. Tokenomist does that with real run logs and success checks
+rather than a pretrained router.
+
 ```bash
-agenttracelab init-agents --out agents.json
+tokenomist init-agents --out agents.json
 ```
 
 Edit `agents.json` so each command matches the tools installed on your machine:
@@ -241,18 +255,39 @@ Fix the failing tests in this repo. Explain what changed and stop when tests pas
 Run every configured agent on that same job:
 
 ```bash
-agenttracelab route job.md --agents agents.json --out runs/fix-tests \
+tokenomist route job.md --agents agents.json --out runs/fix-tests \
   --success-regex "tests pass|DONE|fixed"
 ```
 
 For coding work, use an objective success command when possible:
 
 ```bash
-agenttracelab route job.md --agents agents.json --out runs/fix-tests \
+tokenomist route job.md --agents agents.json --out runs/fix-tests \
   --success-command pytest -q
 ```
 
-That turns the repo into a terminal decision layer: compare Codex vs Gemini vs
+For the strongest comparison, give each agent its own copy of the repo and run
+the check inside that copy:
+
+```bash
+tokenomist route job.md --agents agents.json --out runs/fix-tests \
+  --workspace . --reset-workspaces \
+  --success-command pytest -q
+```
+
+This prevents one agent's edits from affecting another agent's run. The original
+repo stays untouched; each agent works under `runs/fix-tests/workspaces/<agent>/`.
+
+After a few runs, treat the leaderboard as your calibration set: if a cheaper
+agent repeatedly passes the strong check for a task family, route that work to
+it; if it fails or needs too many retries, raise the quality threshold and use a
+stronger agent. The headline number to watch is cost per correct solution.
+
+```bash
+tokenomist calibrate runs/fix-tests
+```
+
+That makes Tokenomist a terminal decision layer: compare Codex vs Gemini vs
 Claude vs Zhipu/GLM vs DeepSeek vs Cursor on your actual task shape, then choose
 the agent with the best mix of correctness, cost, latency, and retry behavior.
 The command adapter is generic on purpose — if a tool can be called
@@ -269,12 +304,12 @@ native-format log:
 pip install -e ".[capture]"
 python harness/run_agent.py --task harness/tasks/merge_intervals \
   --out runs/demo.json --model glm-5.1 --mock   # offline demo, no API key
-agenttracelab analyze runs
+tokenomist analyze runs
 ```
 
 Because each task ships a hidden pytest suite as ground truth, you get objective
-**correctness** alongside the tool's efficiency metrics — enough to rank agents
-by *cost per correct solution*. See [`harness/README.md`](harness/README.md) for
+**correctness** alongside the efficiency metrics — enough to rank agents by
+*cost per correct solution*. See [`harness/README.md`](harness/README.md) for
 endpoint presets and the four-agent recipe, and
 [`docs/case-study.md`](docs/case-study.md) for a write-up scaffold.
 
@@ -284,19 +319,19 @@ Formats are auto-detected from the JSON shape (override with `--format`):
 
 | Format | Source | Shape |
 | --- | --- | --- |
-| `native` | AgentTraceLab schema | `{"turns": [...]}` with explicit metadata |
+| `native` | Tokenomist schema | `{"turns": [...]}` with explicit metadata |
 | `openai_chat` | ChatGPT / Chat Completions / Agents SDK | `{"messages": [{"role", "content"}]}` |
 | `gemini` | Google `generateContent` | `{"contents": [{"role", "parts"}]}` |
 | `langgraph` | LangChain / LangGraph state | `{"messages": [{"type", "content"}]}` |
 
 See [`data/samples`](data/samples) for one example of each. **For the exact
 field-by-field upload contract, see [`FORMAT.md`](FORMAT.md)** (also available
-in the browser demo under “How should my logs look?”).
+in the browser demo under "How should my logs look?").
 
 ## Project layout
 
 ```
-src/agenttracelab/
+src/tokenomist/
   models.py        normalized Conversation / Turn / ToolCall
   tokens.py        token estimation (tiktoken or heuristic)
   pricing.py       price-book loader + latency model (prefix/family matching)

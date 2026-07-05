@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agenttracelab"
+name = "tokenomist"
 version = "0.1.0"
-description = "Characterize and compare agentic LLM workloads from multi-turn conversation logs."
+description = "Measure, route, and compare AI agents by correctness, cost, latency, and tokens."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -26,11 +26,11 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/wuisabel-gif/agent_race"
-Repository = "https://github.com/wuisabel-gif/agent_race"
-Issues = "https://github.com/wuisabel-gif/agent_race/issues"
-Changelog = "https://github.com/wuisabel-gif/agent_race/blob/main/CHANGELOG.md"
-Demo = "https://wuisabel-gif.github.io/agent_race/"
+Homepage = "https://github.com/wuisabel-gif/tokenomist"
+Repository = "https://github.com/wuisabel-gif/tokenomist"
+Issues = "https://github.com/wuisabel-gif/tokenomist/issues"
+Changelog = "https://github.com/wuisabel-gif/tokenomist/blob/main/CHANGELOG.md"
+Demo = "https://wuisabel-gif.github.io/tokenomist/"
 
 [project.optional-dependencies]
 dashboard = ["streamlit>=1.30", "pandas>=2.0"]
@@ -39,13 +39,13 @@ capture = ["openai>=1.0"]
 dev = ["pytest>=7.0", "ruff>=0.6"]
 
 [project.scripts]
-agenttracelab = "agenttracelab.cli:main"
+tokenomist = "tokenomist.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-agenttracelab = ["prices.json"]
+tokenomist = ["prices.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -61,4 +61,4 @@ src = ["src", "tests"]
 select = ["E", "F", "W", "I", "UP", "B"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["agenttracelab"]
+known-first-party = ["tokenomist"]

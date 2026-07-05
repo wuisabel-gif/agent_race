@@ -1,4 +1,4 @@
-"""Parser for AgentTraceLab's own normalized JSON schema.
+"""Parser for Tokenomist's own normalized JSON schema.
 
 This is the richest input format: it carries explicit agent/model metadata,
 per-turn token counts, tool calls, and ground-truth success/score fields. It

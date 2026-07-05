@@ -1,14 +1,13 @@
-"""Command-line interface for AgentTraceLab.
+"""Command-line interface for Tokenomist.
 
 Examples
 --------
-    agenttracelab analyze data/samples/*.json
-    agenttracelab analyze data/samples --json reports.json
-    agenttracelab analyze data/samples --prices my_prices.json
-    agenttracelab init-agents --out agents.json
-    agenttracelab route job.md --agents agents.json --out runs/job1
-    agenttracelab trace data/samples --csv traces.csv
-    agenttracelab formats
+    tokenomist analyze data/samples/*.json
+    tokenomist calibrate runs/fix-tests
+    tokenomist init-agents --out agents.json
+    tokenomist route job.md --agents agents.json --out runs/job1
+    tokenomist trace data/samples --csv traces.csv
+    tokenomist formats
 """
 
 from __future__ import annotations
@@ -89,6 +88,102 @@ def cmd_formats(_args: argparse.Namespace) -> int:
     return 0
 
 
+def _money(value: float | None) -> str:
+    return "n/a" if value is None else f"${value:.4f}"
+
+
+def _render_calibration(reports, *, min_score: float) -> str:
+    by_agent = {}
+    for report in reports:
+        by_agent.setdefault(report.agent, []).append(report)
+
+    rows = []
+    for agent, items in by_agent.items():
+        correct_items = [
+            item for item in items if item.final_correct and item.final_score >= min_score
+        ]
+        known_cost = all(item.cost_estimate_usd is not None for item in items)
+        total_cost = (
+            None if not known_cost else sum(item.cost_estimate_usd or 0.0 for item in items)
+        )
+        cost_per_correct = (
+            None if total_cost is None or not correct_items else total_cost / len(correct_items)
+        )
+        rows.append(
+            {
+                "agent": agent,
+                "runs": len(items),
+                "correct": len(correct_items),
+                "success_rate": len(correct_items) / len(items),
+                "total_cost": total_cost,
+                "cost_per_correct": cost_per_correct,
+                "avg_score": sum(item.final_score for item in items) / len(items),
+                "avg_efficiency": sum(item.convergence_efficiency for item in items) / len(items),
+                "avg_latency_ms": sum(item.latency_estimate_ms for item in items) / len(items),
+            }
+        )
+
+    rows.sort(
+        key=lambda row: (
+            -row["success_rate"],
+            float("inf") if row["cost_per_correct"] is None else row["cost_per_correct"],
+            -row["avg_efficiency"],
+            row["avg_latency_ms"],
+        )
+    )
+    headers = [
+        "Agent",
+        "Runs",
+        "Correct",
+        "Success",
+        "Total cost",
+        "Cost/correct",
+        "Avg score",
+        "Avg eff",
+        "Avg latency",
+    ]
+    table_rows = [
+        [
+            row["agent"],
+            str(row["runs"]),
+            str(row["correct"]),
+            f"{row['success_rate'] * 100:.0f}%",
+            _money(row["total_cost"]),
+            _money(row["cost_per_correct"]),
+            f"{row['avg_score']:.2f}",
+            f"{row['avg_efficiency']:.3f}",
+            f"{row['avg_latency_ms'] / 1000:.1f}s",
+        ]
+        for row in rows
+    ]
+    widths = [len(header) for header in headers]
+    for table_row in table_rows:
+        for idx, cell in enumerate(table_row):
+            widths[idx] = max(widths[idx], len(cell))
+
+    def fmt(cells):
+        return "  ".join(cell.ljust(widths[idx]) for idx, cell in enumerate(cells))
+
+    lines = [fmt(headers), fmt(["-" * width for width in widths])]
+    lines.extend(fmt(row) for row in table_rows)
+    if rows:
+        winner = rows[0]
+        lines.append("")
+        lines.append(
+            "Calibration recommendation: route this task family to "
+            f"{winner['agent']} first "
+            f"({winner['success_rate'] * 100:.0f}% success, "
+            f"{_money(winner['cost_per_correct'])} per correct solution)."
+        )
+    return "\n".join(lines)
+
+
+def cmd_calibrate(args: argparse.Namespace) -> int:
+    reports = _load(args)
+    print(_render_calibration(reports, min_score=args.min_score))
+    return 0
+
+
 def cmd_init_agents(args: argparse.Namespace) -> int:
     out = write_example_config(args.out)
     print(f"Wrote starter agent config to {out}")
@@ -113,6 +208,8 @@ def cmd_route(args: argparse.Namespace) -> int:
                 task_id=args.task_id or Path(args.job).stem,
                 out_dir=args.out,
                 job_path=job_path,
+                workspace=args.workspace,
+                reset_workspace=args.reset_workspaces,
                 success_regex=args.success_regex,
                 score_regex=args.score_regex,
                 success_command=success_command,
@@ -138,7 +235,7 @@ def cmd_route(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="agenttracelab",
+        prog="tokenomist",
         description="Compare how different AI agents solve the same task.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -162,6 +259,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_formats = sub.add_parser("formats", help="List supported log formats.")
     p_formats.set_defaults(func=cmd_formats)
 
+    p_calibrate = sub.add_parser(
+        "calibrate",
+        help="Summarize prior runs as a routing policy by success rate and cost per correct.",
+    )
+    _add_common(p_calibrate)
+    p_calibrate.add_argument(
+        "--min-score",
+        type=float,
+        default=1.0,
+        help="Minimum final_score to count as correct for calibration.",
+    )
+    p_calibrate.set_defaults(func=cmd_calibrate)
+
     p_init = sub.add_parser(
         "init-agents",
         help="Write a starter config for terminal agents such as Codex, Gemini, Claude, or Cursor.",
@@ -182,6 +292,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_route.add_argument("--out", default="runs/route", help="Directory for native run logs.")
     p_route.add_argument("--task-id", default=None, help="Task id for comparison grouping.")
     p_route.add_argument(
+        "--workspace",
+        default=None,
+        help=(
+            "Directory to copy once per agent before running. Use this for strong "
+            "coding comparisons so each agent edits an isolated workspace."
+        ),
+    )
+    p_route.add_argument(
+        "--reset-workspaces",
+        action="store_true",
+        help="Replace existing per-agent workspace copies under OUT/workspaces.",
+    )
+    p_route.add_argument(
         "--extra-prompt",
         default=None,
         help="Additional instructions appended to the job before sending it to each agent.",
@@ -201,11 +324,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_route.add_argument(
         "--success-command",
-        nargs="+",
+        nargs=argparse.REMAINDER,
         default=None,
         help=(
             "Command run after each agent; exit code 0 marks the run correct, "
-            "e.g. --success-command pytest -q."
+            "e.g. --success-command pytest -q. Put this option last."
         ),
     )
     p_route.set_defaults(func=cmd_route)

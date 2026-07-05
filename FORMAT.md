@@ -1,6 +1,6 @@
 # Log format specification
 
-AgentTraceLab analyzes **conversation logs** — one multi-turn run of one agent
+Tokenomist analyzes **conversation logs** — one multi-turn run of one agent
 solving one task. This document is the exact contract for what you upload (in
 the browser demo) or pass to the CLI/library.
 
@@ -50,7 +50,7 @@ with them omitted is treated as an unsolved/failed run.
 
 ### Known model ids (for accurate pricing)
 
-The price book lives in [`src/agenttracelab/prices.json`](src/agenttracelab/prices.json)
+The price book lives in [`src/tokenomist/prices.json`](src/tokenomist/prices.json)
 and covers current models across Anthropic, OpenAI, Google, Z.ai (GLM),
 DeepSeek, Mistral, MiniMax, Qwen, and Llama, plus retained legacy ids.
 

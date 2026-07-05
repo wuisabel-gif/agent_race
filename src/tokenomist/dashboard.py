@@ -1,8 +1,8 @@
-"""Streamlit dashboard for AgentTraceLab.
+"""Streamlit dashboard for Tokenomist.
 
 Run with::
 
-    streamlit run src/agenttracelab/dashboard.py
+    streamlit run src/tokenomist/dashboard.py
 
 Upload one or more conversation logs (or load the bundled samples) and the
 dashboard renders the comparison table plus charts for cost, latency, token
@@ -22,12 +22,12 @@ try:
 except ImportError as exc:  # pragma: no cover - optional dependency
     raise SystemExit(
         "The dashboard needs streamlit and pandas. Install with:\n"
-        "    pip install 'agenttracelab[dashboard]'"
+        "    pip install 'tokenomist[dashboard]'"
     ) from exc
 
-from agenttracelab.analyzer import analyze_many
-from agenttracelab.parsers import load_conversations, parse_data
-from agenttracelab.report import rank_reports
+from tokenomist.analyzer import analyze_many
+from tokenomist.parsers import load_conversations, parse_data
+from tokenomist.report import rank_reports
 
 _SAMPLE_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "samples"
@@ -49,8 +49,8 @@ def _trace_dataframe(reports) -> pd.DataFrame:
 
 
 def main() -> None:
-    st.set_page_config(page_title="AgentTraceLab", layout="wide")
-    st.title("🏁 AgentTraceLab")
+    st.set_page_config(page_title="Tokenomist", layout="wide")
+    st.title("🏁 Tokenomist")
     st.caption(
         "Compare how different AI agents solve the same task — cost, speed, "
         "accuracy, and reasoning efficiency."

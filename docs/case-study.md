@@ -1,15 +1,15 @@
 # Case study: comparing agents on <TASK DOMAIN>
 
 <!--
-This scaffold turns a set of AgentTraceLab runs into a credible write-up. Fill
+This scaffold turns a set of Tokenomist runs into a credible write-up. Fill
 the blanks; delete these comments as you go. The sections in **bold** below are
 the ones that separate a credible study from marketing — don't skip them.
 
 Recommended flow:
   1. Freeze tasks + agent lineup (before running anything).
   2. Run harness/run_agent.py for each (agent x task), a few reps each.
-  3. `agenttracelab analyze runs/ --json reports.json` and
-     `agenttracelab trace runs/ --csv trace.csv`.
+  3. `tokenomist analyze runs/ --json reports.json` and
+     `tokenomist trace runs/ --csv trace.csv`.
   4. Fill in the tables below and write the analysis.
 -->
 
@@ -48,14 +48,14 @@ Each (agent × task) was run **<R> times**; numbers below are <mean / median>
 with the spread noted. Prices from `prices.json`, `last_verified <date>`.
 
 **What "correct" means.** All tests in a task's suite pass. This is the study's
-ground truth and the thing AgentTraceLab itself does *not* verify — it's supplied
+ground truth and the thing Tokenomist itself does *not* verify — it's supplied
 here by the harness.
 
 ## Results
 
 ### Leaderboard (pooled across tasks)
 
-<!-- Paste/normalize `agenttracelab analyze runs/`. -->
+<!-- Paste/normalize `tokenomist analyze runs/`. -->
 
 | Agent | Model | Solved | →Success | Tokens | Retries | Fixes | Latency | Cost | Efficiency |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

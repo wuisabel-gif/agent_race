@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import time
 from dataclasses import dataclass
@@ -21,6 +22,19 @@ class TerminalAgent:
     cwd: str | None = None
     timeout_sec: int = 900
     env: dict[str, str] | None = None
+
+
+_WORKSPACE_IGNORES = (
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "__pycache__",
+    "*.pyc",
+    "runs",
+    "dist",
+    "build",
+)
 
 
 def example_config() -> dict[str, Any]:
@@ -119,6 +133,35 @@ def _score_from_regex(output: str, score_regex: str | None) -> float:
     return 1.0
 
 
+def _safe_name(name: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_.-]+", "_", name).strip("_") or "agent"
+
+
+def _prepare_workspace(
+    source: str | Path | None,
+    *,
+    out_dir: str | Path,
+    agent_name: str,
+    reset: bool,
+) -> Path | None:
+    if source is None:
+        return None
+    src = Path(source).resolve()
+    if not src.is_dir():
+        raise ValueError(f"--workspace must be a directory: {src}")
+    dest = Path(out_dir).resolve() / "workspaces" / _safe_name(agent_name)
+    if dest.exists():
+        if not reset:
+            raise FileExistsError(
+                f"Workspace already exists for {agent_name}: {dest}. "
+                "Delete it or pass --reset-workspaces."
+            )
+        shutil.rmtree(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest, ignore=shutil.ignore_patterns(*_WORKSPACE_IGNORES))
+    return dest
+
+
 def _run_success_command(command: list[str] | None, cwd: str | Path | None) -> tuple[bool, str]:
     if not command:
         return False, "No success command configured."
@@ -134,18 +177,37 @@ def run_terminal_agent(
     task_id: str,
     out_dir: str | Path,
     job_path: str | None = None,
+    workspace: str | Path | None = None,
+    reset_workspace: bool = False,
     success_regex: str | None = None,
     score_regex: str | None = None,
     success_command: list[str] | None = None,
 ) -> Path:
     """Run one configured terminal agent and write a native-format log."""
 
+    run_cwd = _prepare_workspace(
+        workspace,
+        out_dir=out_dir,
+        agent_name=agent.name,
+        reset=reset_workspace,
+    )
+    cwd = Path(agent.cwd).resolve() if agent.cwd else run_cwd
+    if run_cwd is not None:
+        prompt = (
+            prompt.rstrip()
+            + "\n\n"
+            + "Work only inside this isolated workspace copy:\n"
+            + str(run_cwd)
+            + "\n"
+        )
+
     command = _format_command(agent.command, prompt, job_path)
+    command = [part.replace("{workspace}", str(cwd or "")) for part in command]
     t0 = time.perf_counter()
     try:
         proc = subprocess.run(
             command,
-            cwd=agent.cwd,
+            cwd=cwd,
             input=prompt,
             capture_output=True,
             text=True,
@@ -167,17 +229,20 @@ def run_terminal_agent(
     checks: list[dict[str, Any]] = [
         {
             "name": "run_agent_command",
-            "arguments": {"command": command},
+            "arguments": {"command": command, "cwd": str(cwd) if cwd else None},
             "ok": command_ok,
         }
     ]
 
     if success_command:
-        passed, check_output = _run_success_command(success_command, agent.cwd)
+        passed, check_output = _run_success_command(success_command, cwd)
         checks.append(
             {
                 "name": "run_success_command",
-                "arguments": {"command": success_command},
+                "arguments": {
+                    "command": success_command,
+                    "cwd": str(cwd) if cwd else None,
+                },
                 "ok": passed,
                 "result": check_output[-2000:],
             }
@@ -211,7 +276,7 @@ def run_terminal_agent(
         ],
     }
 
-    safe_name = re.sub(r"[^a-zA-Z0-9_.-]+", "_", agent.name).strip("_") or "agent"
+    safe_name = _safe_name(agent.name)
     out_path = Path(out_dir) / f"{safe_name}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(log, indent=2), encoding="utf-8")

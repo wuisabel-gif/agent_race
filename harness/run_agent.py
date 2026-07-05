@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""AgentTraceLab capture harness.
+"""Tokenomist capture harness.
 
 Run one coding task against one model, with a test-feedback loop, and emit a
-**native-format** AgentTraceLab log (real token usage + real wall-clock latency
+**native-format** Tokenomist log (real token usage + real wall-clock latency
 baked in). Point it at any OpenAI-compatible endpoint — Z.ai (GLM), DeepSeek,
 OpenAI, or a local server — so a single script covers whatever key you have.
 
@@ -25,13 +25,13 @@ Metrics that fall out, all measured (not guessed):
   * input/output_tokens, latency_ms = from the API response + a wall-clock timer
 
 The 4-agent comparison comes from running this several times with the SAME
---task-id into one output dir, then: `agenttracelab analyze <dir>`. Vary --model
+--task-id into one output dir, then: `tokenomist analyze <dir>`. Vary --model
 (tier) and --max-turns (scaffold: 1 = raw single-shot, >1 = test-feedback loop).
 
 SECURITY: this executes model-generated code via pytest in a temp dir. Only run
 tasks you trust, ideally in a container/VM. Pass --i-understand-code-execution.
 
-Requires the openai client for live runs:  pip install "agenttracelab[capture]"
+Requires the openai client for live runs:  pip install "tokenomist[capture]"
 Use --mock to try the whole pipeline with no API key and no network.
 """
 
@@ -123,7 +123,7 @@ class _OpenAICompatClient:
         except ImportError as exc:  # pragma: no cover
             raise SystemExit(
                 "The openai client is required for live runs. Install it with:\n"
-                '    pip install "agenttracelab[capture]"\n'
+                '    pip install "tokenomist[capture]"\n'
                 "or run with --mock to try the pipeline offline."
             ) from exc
         import os
@@ -269,7 +269,7 @@ def run(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="run_agent",
-        description="Capture an agent solving a coding task into an AgentTraceLab log.",
+        description="Capture an agent solving a coding task into an Tokenomist log.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Endpoint presets (set the matching *_API_KEY env var):\n"
@@ -280,7 +280,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  OpenAI       (omit --base-url) --api-model gpt-4o --model gpt-4o "
             "--api-key-env OPENAI_API_KEY\n\n"
             "  --api-model is the string sent to the API; --model is the price-book\n"
-            "  id written to the log (used by AgentTraceLab for cost). Keep --model a\n"
+            "  id written to the log (used by Tokenomist for cost). Keep --model a\n"
             "  known family from prices.json so cost isn't n/a.\n"
         ),
     )

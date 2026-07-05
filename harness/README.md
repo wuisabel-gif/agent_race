@@ -1,14 +1,14 @@
 # Capture harness
 
 `run_agent.py` runs one coding task against one model, with a test-feedback
-loop, and writes a **native-format** AgentTraceLab log with **real token usage
+loop, and writes a **native-format** Tokenomist log with **real token usage
 and real wall-clock latency** baked in. Point it at any OpenAI-compatible
 endpoint, so a single script covers whatever API key you have.
 
 Its output feeds straight into the analyzer:
 
 ```bash
-agenttracelab analyze runs/         # a directory of logs from several agents
+tokenomist analyze runs/         # a directory of logs from several agents
 ```
 
 ## Install
@@ -25,7 +25,7 @@ pip install -e ".[capture]"   # adds the openai client (used for live runs)
 python harness/run_agent.py \
   --task harness/tasks/merge_intervals \
   --out runs/mock.json --agent "Demo" --model glm-5.1 --mock
-agenttracelab analyze runs
+tokenomist analyze runs
 ```
 
 The mock model fails once, gets the test failure fed back, then fixes it — so
@@ -103,7 +103,7 @@ run ... --agent "DeepSeek V4"   --model deepseek-v4-pro --max-turns 6 --out $D/d
 # 4) SCAFFOLD CONTRAST: same frontier model, raw single-shot (no feedback)
 run ... --agent "GLM-5.1 (raw)" --model glm-5.1 --max-turns 1 --out $D/glm51_raw.json
 
-agenttracelab analyze runs/merge_intervals
+tokenomist analyze runs/merge_intervals
 ```
 
 `--max-turns 1` is the raw baseline (one shot, no test feedback); `--max-turns
@@ -133,5 +133,5 @@ the canned reference solution you ship with the task.
 | `final_score` | fraction of tests passing at the end (`1.0` ⇒ `final_correct`) |
 | `tool_calls[].ok` | whether the patch parsed and whether the tests passed |
 
-Cost is then computed by AgentTraceLab from `model` + real token counts, so your
+Cost is then computed by Tokenomist from `model` + real token counts, so your
 numbers are exact rather than price-book estimates.

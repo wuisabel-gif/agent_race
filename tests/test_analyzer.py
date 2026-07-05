@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import os
 
-from agenttracelab.analyzer import analyze, analyze_many, build_trace
-from agenttracelab.models import Role
-from agenttracelab.parsers import load_conversation, load_conversations
-from agenttracelab.report import rank_reports, render_table, reports_to_json, trace_to_csv
+from tokenomist.analyzer import analyze, analyze_many, build_trace
+from tokenomist.models import Role
+from tokenomist.parsers import load_conversation, load_conversations
+from tokenomist.report import rank_reports, render_table, reports_to_json, trace_to_csv
 
 SAMPLE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "samples")
 

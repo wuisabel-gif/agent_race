@@ -6,8 +6,8 @@ import os
 
 import pytest
 
-from agenttracelab.models import Role
-from agenttracelab.parsers import (
+from tokenomist.models import Role
+from tokenomist.parsers import (
     UnknownFormatError,
     available_formats,
     detect_parser,

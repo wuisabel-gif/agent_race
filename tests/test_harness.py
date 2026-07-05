@@ -1,7 +1,7 @@
 """Smoke test for the capture harness (offline mock mode).
 
 Runs harness/run_agent.py against the bundled example task with --mock (no API
-key, no network), then feeds the emitted log back through AgentTraceLab to prove
+key, no network), then feeds the emitted log back through Tokenomist to prove
 the harness produces a valid, scorable native-format log.
 """
 
@@ -48,8 +48,8 @@ def test_harness_mock_produces_scorable_log(tmp_path):
     assert any(t.get("is_retry") for t in log["turns"])
     assert any(t.get("is_correction") for t in log["turns"])
 
-    # And the emitted log is readable + scorable by AgentTraceLab.
-    from agenttracelab import analyze, load_conversations
+    # And the emitted log is readable + scorable by Tokenomist.
+    from tokenomist import analyze, load_conversations
 
     convs = load_conversations([str(out)])
     assert len(convs) == 1

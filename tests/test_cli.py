@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-from agenttracelab.cli import main
+from tokenomist.cli import main
 
 SAMPLES = Path(__file__).resolve().parent.parent / "data" / "samples"
 
@@ -52,6 +52,14 @@ def test_formats_lists_parsers(capsys):
     assert rc == 0
     assert "native" in out
     assert "openai_chat" in out
+
+
+def test_calibrate_reports_cost_per_correct(capsys):
+    rc = main(["calibrate", str(SAMPLES)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "Cost/correct" in out
+    assert "Calibration recommendation" in out
 
 
 def test_unknown_model_reports_na(tmp_path, capsys):
@@ -137,3 +145,71 @@ def test_route_runs_terminal_agents_and_recommends(tmp_path, capsys):
     assert "Recommendation: use FastAgent" in printed
     assert (out_dir / "FastAgent.json").exists()
     assert (out_dir / "WrongAgent.json").exists()
+
+
+def test_route_success_command_runs_in_isolated_workspaces(tmp_path, capsys):
+    job = tmp_path / "job.md"
+    job.write_text("Fix solution.py so pytest passes.", encoding="utf-8")
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "solution.py").write_text("def answer():\n    return 0\n", encoding="utf-8")
+    (workspace / "test_solution.py").write_text(
+        "from solution import answer\n\n\ndef test_answer():\n    assert answer() == 42\n",
+        encoding="utf-8",
+    )
+
+    fixer = (
+        "from pathlib import Path; "
+        "Path('solution.py').write_text('def answer():\\n    return 42\\n')"
+    )
+    agents = tmp_path / "agents.json"
+    agents.write_text(
+        json.dumps(
+            {
+                "agents": [
+                    {
+                        "name": "Fixer",
+                        "model": "gpt-4o-mini",
+                        "command": [sys.executable, "-c", fixer],
+                    },
+                    {
+                        "name": "Observer",
+                        "model": "gpt-4o-mini",
+                        "command": [sys.executable, "-c", "print('no change')"],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    out_dir = tmp_path / "runs"
+
+    rc = main(
+        [
+            "route",
+            str(job),
+            "--agents",
+            str(agents),
+            "--out",
+            str(out_dir),
+            "--workspace",
+            str(workspace),
+            "--reset-workspaces",
+            "--success-command",
+            sys.executable,
+            "-m",
+            "pytest",
+            "-q",
+        ]
+    )
+    printed = capsys.readouterr().out
+    assert rc == 0
+    assert "Recommendation: use Fixer" in printed
+    assert "return 0" in (workspace / "solution.py").read_text(encoding="utf-8")
+    assert "return 42" in (out_dir / "workspaces" / "Fixer" / "solution.py").read_text(
+        encoding="utf-8"
+    )
+    assert "return 0" in (out_dir / "workspaces" / "Observer" / "solution.py").read_text(
+        encoding="utf-8"
+    )

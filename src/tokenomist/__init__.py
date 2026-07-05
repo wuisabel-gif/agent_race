@@ -1,4 +1,4 @@
-"""AgentTraceLab — characterize and compare agentic LLM workloads.
+"""Tokenomist — characterize and compare agentic LLM workloads.
 
 Converts multi-turn AI conversations (ChatGPT, Gemini, Claude, OpenAI Agents
 SDK, LangGraph, or custom logs) into structured traffic traces, then estimates

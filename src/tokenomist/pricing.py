@@ -54,7 +54,7 @@ def _load_price_records(path: str | Path | None = None) -> tuple[dict[str, Model
     if path is not None:
         raw = Path(path).read_text(encoding="utf-8")
     elif _pkg_files is not None:
-        raw = (_pkg_files("agenttracelab") / _PRICES_FILENAME).read_text(encoding="utf-8")
+        raw = (_pkg_files("tokenomist") / _PRICES_FILENAME).read_text(encoding="utf-8")
     else:  # pragma: no cover - fallback for exotic environments
         raw = (Path(__file__).parent / _PRICES_FILENAME).read_text(encoding="utf-8")
 

@@ -1,6 +1,6 @@
 """Turn conversations into structured traffic traces and aggregate metrics.
 
-Two outputs are produced from a :class:`~agenttracelab.models.Conversation`:
+Two outputs are produced from a :class:`~tokenomist.models.Conversation`:
 
 * a per-turn **traffic trace** (:class:`TraceRow`) — the workload-characterization
   view, where each assistant generation re-reads the growing context, so input

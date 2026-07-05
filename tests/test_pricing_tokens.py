@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from agenttracelab.pricing import DEFAULT_PRICES, ModelPrice, PriceBook
-from agenttracelab.tokens import estimate_tokens
+from tokenomist.pricing import DEFAULT_PRICES, ModelPrice, PriceBook
+from tokenomist.tokens import estimate_tokens
 
 
 def test_estimate_tokens_empty():
