@@ -3,11 +3,10 @@
 Prices live in a data file (:data:`prices.json` next to this module) rather than
 in code, so they can be updated without touching logic and overridden per run.
 Each entry is a *family* — a stable model-name prefix such as ``claude-sonnet-4-6``
-— plus aliases, optional regex model patterns, USD-per-million-token
-input/output rates, an optional cached-input rate, and a rough output throughput
-used to estimate latency when a log has no timestamps. The numbers are
-approximate public list prices meant for *relative* comparison between agents,
-not for billing.
+— plus aliases, optional regex model patterns, USD-per-million-token rates by
+usage dimension, and a rough output throughput used to estimate latency when a
+log has no timestamps. The numbers are approximate public list prices meant for
+*relative* comparison between agents, not for billing.
 
 Model names in real logs carry dated suffixes, provider prefixes, and endpoint
 aliases (``claude-sonnet-4-6-20250514``, ``zhipu/glm-5.1``,
@@ -38,12 +37,13 @@ _TURN_OVERHEAD_MS = 350.0
 
 @dataclass(frozen=True)
 class ModelPrice:
-    """Per-million-token prices, optional cache rate, and rough throughput."""
+    """Per-million-token prices by usage dimension plus rough throughput."""
 
     input_per_mtok: float
     output_per_mtok: float
     output_tokens_per_sec: float = _DEFAULT_OUTPUT_TPS
     cache_read_per_mtok: float | None = None
+    cache_write_per_mtok: float | None = None
     provider: str | None = None
     family: str | None = None
     model_patterns: tuple[str, ...] = ()
@@ -78,6 +78,9 @@ def _load_price_records(
             output_tokens_per_sec=float(rec.get("tps", default_tps)),
             cache_read_per_mtok=(
                 None if rec.get("cache_read") is None else float(rec["cache_read"])
+            ),
+            cache_write_per_mtok=(
+                None if rec.get("cache_write") is None else float(rec["cache_write"])
             ),
             provider=rec.get("provider"),
             family=family,
@@ -172,21 +175,53 @@ class PriceBook:
         details: dict[str, float] = {}
         input_tokens = usage_details.get("input_tokens", usage_details.get("input", 0))
         output_tokens = usage_details.get("output_tokens", usage_details.get("output", 0))
-        cached_tokens = usage_details.get("cached_input_tokens", 0) + usage_details.get(
+        cache_read_tokens = usage_details.get("cached_input_tokens", 0) + usage_details.get(
             "cache_read_input_tokens", 0
         )
+        cache_write_tokens = usage_details.get("cache_creation_input_tokens", 0)
 
-        billable_input_tokens = max(0, input_tokens - cached_tokens)
+        # Normalized Tokenomist usage treats input_tokens as inclusive of cache
+        # reads/writes. For catalogs without a cache discount, price cached
+        # tokens at the normal input rate instead of letting them ride free.
+        billable_input_tokens = max(0, input_tokens - cache_read_tokens - cache_write_tokens)
         if billable_input_tokens:
             details["input"] = billable_input_tokens / 1_000_000 * price.input_per_mtok
         if output_tokens:
             details["output"] = output_tokens / 1_000_000 * price.output_per_mtok
-        if cached_tokens and price.cache_read_per_mtok is not None:
-            details["cache_read"] = cached_tokens / 1_000_000 * price.cache_read_per_mtok
+        if cache_read_tokens:
+            cache_read_rate = price.cache_read_per_mtok
+            if cache_read_rate is None:
+                cache_read_rate = price.input_per_mtok
+            details["cache_read"] = cache_read_tokens / 1_000_000 * cache_read_rate
+        if cache_write_tokens:
+            cache_write_rate = price.cache_write_per_mtok
+            if cache_write_rate is None:
+                cache_write_rate = price.input_per_mtok
+            details["cache_write"] = cache_write_tokens / 1_000_000 * cache_write_rate
 
         if details:
             details["total"] = sum(details.values())
         return details
+
+    def unpriced_dimensions(self, model: str | None, usage_details: dict[str, int]) -> list[str]:
+        """Usage keys with non-zero tokens that are not priced by this catalog."""
+
+        if self.resolve(model) is None:
+            return []
+        priced_keys = {
+            "input",
+            "input_tokens",
+            "output",
+            "output_tokens",
+            "cached_input_tokens",
+            "cache_read_input_tokens",
+            "cache_creation_input_tokens",
+        }
+        return sorted(
+            key
+            for key, value in usage_details.items()
+            if key not in priced_keys and int(value or 0) != 0
+        )
 
     def latency_ms(self, model: str | None, output_tokens: int) -> float:
         """Estimate generation latency from output token count.

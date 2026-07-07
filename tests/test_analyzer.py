@@ -11,6 +11,7 @@ from tokenomist.parsers import load_conversation, load_conversations, parse_data
 from tokenomist.report import (
     ledger_to_jsonl,
     rank_reports,
+    render_cost_audit,
     render_table,
     reports_to_json,
     trace_to_csv,
@@ -97,6 +98,9 @@ def test_ledger_jsonl_full_and_preview_exports():
     assert first_full["projection"] == "full"
     assert "content" in first_full
     assert first_full["content_length"] == len(first_full["content"])
+    assert "derived_cost_details" in first_full
+    assert "cost_source" in first_full
+    assert "unpriced_dimensions" in first_full
     assert first_full["record_bytes"] > 0
 
     preview = ledger_to_jsonl(reports, projection="preview", preview_chars=5)
@@ -124,6 +128,7 @@ def test_usage_and_cost_detail_maps_are_aggregated():
     assert rep.usage_details["cached_input_tokens"] == 200
     assert rep.provided_usage_details["cached_input_tokens"] == 201
     assert set(rep.cost_details) >= {"input", "output", "cache_read"}
+    assert set(rep.derived_cost_details) >= {"input", "output", "cache_read"}
 
 
 def test_provider_cost_details_are_authoritative():
@@ -149,7 +154,59 @@ def test_provider_cost_details_are_authoritative():
     assert rep.cost_details["input"] == 0.01
     assert rep.cost_details["output"] == 0.02
     assert rep.cost_details["total"] == 0.03
+    assert rep.derived_cost_details["input"] == 2.5
+    assert rep.derived_cost_details["output"] == 10.0
+    assert rep.cost_sources["provided"] == 1
     assert rep.cost_estimate_usd == 0.03
+
+
+def test_cost_audit_flags_provider_derived_drift():
+    conv = parse_data(
+        {
+            "agent": "ProviderCostAgent",
+            "model": "gpt-4o",
+            "turns": [
+                {
+                    "role": "assistant",
+                    "content": "done",
+                    "usage_details": {
+                        "input_tokens": 1_000_000,
+                        "output_tokens": 0,
+                    },
+                    "provided_cost_details": {"input": 0.01},
+                }
+            ],
+        }
+    )
+
+    audit = render_cost_audit([analyze(conv)], threshold=0.01)
+    assert "ProviderCostAgent" in audit
+    assert "provided" in audit
+    assert "-99.6%" in audit
+
+
+def test_unpriced_usage_dimensions_are_preserved():
+    conv = parse_data(
+        {
+            "agent": "ReasoningAgent",
+            "model": "gpt-4o",
+            "turns": [
+                {
+                    "role": "assistant",
+                    "content": "done",
+                    "usage_details": {
+                        "input_tokens": 100,
+                        "output_tokens": 10,
+                        "reasoning_tokens": 25,
+                    },
+                }
+            ],
+        }
+    )
+
+    rep = analyze(conv)
+    assert rep.unpriced_dimensions == ["reasoning_tokens"]
+    assert rep.trace[0].unpriced_dimensions == ["reasoning_tokens"]
 
 
 def test_empty_table():

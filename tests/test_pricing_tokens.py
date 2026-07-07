@@ -86,6 +86,36 @@ def test_cost_details_include_cache_read():
     assert details["total"] == sum(value for key, value in details.items() if key != "total")
 
 
+def test_cache_read_without_discount_falls_back_to_input_rate():
+    book = PriceBook({"mymodel": ModelPrice(2.0, 4.0, 50.0, cache_read_per_mtok=None)})
+    details = book.cost_details_usd(
+        "mymodel",
+        {"input_tokens": 1000, "cached_input_tokens": 200, "output_tokens": 0},
+    )
+    assert details is not None
+    assert details["input"] == 800 / 1_000_000 * 2.0
+    assert details["cache_read"] == 200 / 1_000_000 * 2.0
+
+
+def test_cache_write_dimension_is_priced():
+    book = PriceBook()
+    details = book.cost_details_usd(
+        "claude-sonnet-4-6",
+        {"input_tokens": 1000, "cache_creation_input_tokens": 200, "output_tokens": 0},
+    )
+    assert details is not None
+    assert details["input"] == 800 / 1_000_000 * 3.0
+    assert details["cache_write"] == 200 / 1_000_000 * 3.75
+
+
+def test_unpriced_dimensions_are_reported():
+    book = PriceBook()
+    assert book.unpriced_dimensions(
+        "gpt-4o",
+        {"input_tokens": 100, "reasoning_tokens": 25, "output_tokens": 10},
+    ) == ["reasoning_tokens"]
+
+
 def test_latency_grows_with_output():
     book = PriceBook()
     assert book.latency_ms("gpt-4o", 1000) > book.latency_ms("gpt-4o", 10)

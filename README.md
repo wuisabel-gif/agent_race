@@ -101,8 +101,10 @@ a ready-made input for a queueing model or datacenter simulator.
 | `correction_count` | Times the user had to redirect the agent |
 | `latency_estimate_ms` | Throughput-modeled generation latency |
 | `cost_estimate_usd` | Token cost using a configurable price book |
-| `usage_details`, `cost_details` | Open-ended usage/cost maps derived by Tokenomist |
+| `usage_details`, `cost_details` | Normalized usage and selected headline cost maps |
+| `derived_cost_details` | Price-book-computed cost map, kept even when provider cost wins |
 | `provided_usage_details`, `provided_cost_details` | Provider-reported usage/cost maps kept for drift audits |
+| `cost_sources`, `unpriced_dimensions` | Cost provenance counts and visible unpriced usage dimensions |
 | `convergence_efficiency` | 0–1: correct answers reached with the least budget and fewest corrections |
 
 ## Install
@@ -164,6 +166,9 @@ tokenomist ledger data/samples --jsonl ledger.jsonl
 # Export preview rows for indexing/search without full message bodies
 tokenomist ledger data/samples --projection preview --jsonl ledger-preview.jsonl
 
+# Flag provider/log cost values that drift from derived price-book cost
+tokenomist audit data/samples --threshold 0.03
+
 # Use your own up-to-date price book instead of the bundled one
 tokenomist analyze data/samples --prices my_prices.json
 
@@ -179,19 +184,31 @@ tokenomist formats
 
 Model prices live in [`src/tokenomist/prices.json`](src/tokenomist/prices.json),
 not in code — each entry is a model *family* (a stable name prefix like
-`claude-sonnet-4-6`) plus input/output/cache-read rates per million tokens,
-aliases, optional regex `model_patterns`, and a rough throughput for latency
-estimation. Lookup matches exact ids/aliases, then longest family prefix, then
-regex patterns, so dated model ids such as `claude-sonnet-4-6-20250514` and
-provider strings such as `zhipu/glm-5.1` still resolve. Tokenomist stores derived
-`usage_details` / `cost_details` maps separately from provider-reported
-`provided_usage_details` / `provided_cost_details`, so reports can surface usage
-or billing drift instead of overwriting it. Provider cost is treated as
-authoritative when present; derived price-book cost is used only when no
-provider cost was supplied. An **unknown model reports cost as `n/a`** rather
-than a fabricated number. Prices are approximate public list prices for
-*relative* comparison, verified `2026-07-04`; update the file (and bump
-`last_verified`) or pass `--prices` to keep them current.
+`claude-sonnet-4-6`) plus input/output/cache-read/cache-write rates per million
+tokens, aliases, optional regex `model_patterns`, and a rough throughput for
+latency estimation. Lookup matches exact ids/aliases, then longest family
+prefix, then regex patterns, so dated model ids such as
+`claude-sonnet-4-6-20250514` and provider strings such as `zhipu/glm-5.1` still
+resolve.
+
+Tokenomist stores provider-reported, log-supplied, and price-book-derived costs
+side by side. `cost_details` is the selected headline map using this precedence:
+`provided_cost_details` first, then log `cost_details`, then
+`derived_cost_details`. The selected source is recorded as `cost_source` per
+turn and summarized as `cost_sources` per report. `derived_cost_details` is
+still computed when possible, so billing drift can be audited instead of hidden.
+
+Normalized `usage_details.input_tokens` is **inclusive** of cache-read and
+cache-write tokens. Provider adapters should convert disjoint provider fields
+into that convention before analysis. If a price entry has no cache discount,
+Tokenomist prices cached tokens at the normal input rate rather than treating
+them as free. Any non-zero usage dimension without a price, such as
+`reasoning_tokens`, appears in `unpriced_dimensions`.
+
+An **unknown model reports cost as `n/a`** rather than a fabricated number.
+Prices are approximate public list prices for *relative* comparison, verified
+`2026-07-04`; update the file (and bump `last_verified`) or pass `--prices` to
+keep them current.
 
 ### Ledger export
 
@@ -220,6 +237,19 @@ The preview keeps the same accounting fields as the full ledger, but stores
 `content_preview` instead of `content` and marks whether the original message was
 truncated. Both projections include `record_bytes`, which helps spot unusually
 large turns before you load them into a warehouse or search system.
+
+### Cost audit
+
+Use `tokenomist audit` when logs include provider-reported or log-supplied cost
+and you want to compare it against Tokenomist's price-book-derived cost:
+
+```bash
+tokenomist audit runs/fix-tests --threshold 0.03
+```
+
+The threshold is relative drift, so `0.03` reports turns where selected cost and
+derived cost differ by at least 3 percent. This is useful for catching stale
+price books, provider billing changes, or parser normalization mistakes.
 
 ### Dashboard
 
@@ -386,6 +416,15 @@ Tokenomist does not train a RouteLLM router. It adapts the paper's practical
 cost-quality framing — weak model, strong model, performance gap recovered, and
 call-performance threshold — to terminal-agent logs with objective success
 checks.
+
+## Acknowledgements
+
+Tokenomist's model-matching and cost-provenance design was informed by
+production observability patterns in
+[Langfuse](https://github.com/langfuse/langfuse), especially the separation
+between provider-reported usage/cost fields and derived accounting fields.
+Tokenomist implements these ideas independently for terminal-agent comparison
+and routing workflows.
 
 ## Capture your own agent runs
 

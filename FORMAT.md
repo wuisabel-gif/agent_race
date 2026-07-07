@@ -74,9 +74,9 @@ list of ids.
 | `role` (or `type` for LangGraph) | string | `user` / `assistant` / `tool` / `system`. LangGraph uses `human` / `ai` / `tool` / `system`. |
 | `content` | string | The message text. |
 | `input_tokens`, `output_tokens` | int | Optional. If omitted, estimated from the text (~4 chars/token, or tiktoken if installed in the Python lib). |
-| `usage_details` | object | Optional Tokenomist-normalized usage map. Use open-ended keys such as `input_tokens`, `output_tokens`, `cached_input_tokens`, `reasoning_tokens`, or provider-specific dimensions. |
+| `usage_details` | object | Optional Tokenomist-normalized usage map. Use open-ended keys such as `input_tokens`, `output_tokens`, `cached_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`, or provider-specific dimensions. |
 | `provided_usage_details` | object | Optional provider-reported usage map copied from the API response. Kept separate from Tokenomist-derived usage so drift can be audited. |
-| `cost_details` | object | Optional Tokenomist-normalized cost map in USD, e.g. `{ "input": 0.01, "output": 0.02, "cache_read": 0.001 }`. If omitted and the model is known, Tokenomist derives it from `usage_details`. |
+| `cost_details` | object | Optional log-supplied cost map in USD, e.g. `{ "input": 0.01, "output": 0.02, "cache_read": 0.001 }`. If omitted and the model is known, Tokenomist derives `derived_cost_details` from `usage_details`. |
 | `provided_cost_details` | object | Optional provider-reported cost map in USD. Kept separate from derived cost for provenance and comparison. |
 | `latency_ms` | number | Optional. If omitted, estimated from output tokens. |
 | `tool_calls` | array | Optional. See below. |
@@ -89,11 +89,24 @@ and table output. New capture integrations should prefer `usage_details` and
 Tokenomist reports both aggregate maps in JSON output and includes them in trace
 CSV exports.
 
-Cost precedence follows the production observability pattern: if
-`provided_cost_details` contains any cost point, Tokenomist treats it as
-authoritative for that turn and adds `total` when it can be derived. If no
-provider cost is supplied, Tokenomist uses `cost_details` when present, otherwise
-it derives `cost_details` from the price book and usage map.
+Normalized `usage_details.input_tokens` is **inclusive** of cache-read and
+cache-write tokens. If a provider reports cache fields separately from normal
+input, convert them into this convention before analysis. For example, an
+Anthropic turn with `input_tokens = 800`, `cache_read_input_tokens = 200`, and
+`cache_creation_input_tokens = 100` should be normalized to
+`input_tokens = 1100` with the cache dimensions preserved.
+
+Cost precedence follows the production observability pattern:
+`provided_cost_details` wins when present, then log-supplied `cost_details`, then
+price-book-derived `derived_cost_details`. Tokenomist still computes
+`derived_cost_details` when possible, records the selected `cost_source`, and
+surfaces non-zero `unpriced_dimensions` such as `reasoning_tokens` when a usage
+dimension has no matching price. If a cached-input discount is unknown for a
+model, cached tokens are priced at the normal input rate rather than treated as
+free.
+
+Use `tokenomist audit <logs> --threshold 0.03` to flag provider/log cost values
+that differ from price-book-derived cost by at least 3 percent.
 
 ### Ledger JSONL export
 
@@ -107,9 +120,10 @@ tokenomist ledger runs/fix-tests --projection full --jsonl ledger.jsonl
 tokenomist ledger runs/fix-tests --projection preview --jsonl ledger-preview.jsonl
 ```
 
-Each row includes task and agent metadata, usage/cost provenance maps, latency,
-tool and retry flags, correctness, convergence efficiency, `content_length`, and
-`record_bytes` for storage/indexing diagnostics.
+Each row includes task and agent metadata, usage/cost provenance maps, selected
+and derived cost, `cost_source`, `unpriced_dimensions`, latency, tool and retry
+flags, correctness, convergence efficiency, `content_length`, and `record_bytes`
+for storage/indexing diagnostics.
 
 ### Tool call object
 

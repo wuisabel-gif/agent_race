@@ -39,6 +39,9 @@ class TraceRow:
     cost_usd: float | None
     cost_details: dict[str, float]
     provided_cost_details: dict[str, float]
+    derived_cost_details: dict[str, float]
+    cost_source: str
+    unpriced_dimensions: list[str]
     cumulative_cost_usd: float | None
     is_retry: bool
     is_correction: bool
@@ -67,6 +70,9 @@ class AgentReport:
     cost_estimate_usd: float | None
     cost_details: dict[str, float]
     provided_cost_details: dict[str, float]
+    derived_cost_details: dict[str, float]
+    cost_sources: dict[str, int]
+    unpriced_dimensions: list[str]
     success_turn: int | None
     turns_to_success: int | None
     tokens_to_success: int | None
@@ -137,12 +143,17 @@ def build_trace(conv: Conversation, prices: PriceBook | None = None) -> list[Tra
             }
             provided_usage_details = dict(turn.provided_usage_details)
             provided_cost_details = _finalize_cost_details(dict(turn.provided_cost_details))
+            derived_cost_details = prices.cost_details_usd(conv.model, usage_details)
+            unpriced_dimensions = prices.unpriced_dimensions(conv.model, usage_details)
             if provided_cost_details:
                 cost_details = provided_cost_details
+                cost_source = "provided"
             elif turn.cost_details:
                 cost_details = _finalize_cost_details(dict(turn.cost_details))
+                cost_source = "log"
             else:
-                cost_details = prices.cost_details_usd(conv.model, usage_details)
+                cost_details = derived_cost_details
+                cost_source = "derived" if cost_details is not None else "unknown"
             cost = None if cost_details is None else _total_cost_from_details(cost_details)
             latency = (
                 turn.latency_ms
@@ -156,6 +167,9 @@ def build_trace(conv: Conversation, prices: PriceBook | None = None) -> list[Tra
             provided_usage_details = {}
             cost_details = {} if model_known else None
             provided_cost_details = {}
+            derived_cost_details = {} if model_known else None
+            cost_source = "none" if model_known else "unknown"
+            unpriced_dimensions = []
 
         if cost is not None and cumulative_cost is not None:
             cumulative_cost += cost
@@ -182,6 +196,13 @@ def build_trace(conv: Conversation, prices: PriceBook | None = None) -> list[Tra
                     else {k: round(v, 6) for k, v in cost_details.items()}
                 ),
                 provided_cost_details={k: round(v, 6) for k, v in provided_cost_details.items()},
+                derived_cost_details=(
+                    {}
+                    if derived_cost_details is None
+                    else {k: round(v, 6) for k, v in derived_cost_details.items()}
+                ),
+                cost_source=cost_source,
+                unpriced_dimensions=unpriced_dimensions,
                 cumulative_cost_usd=(
                     None if cumulative_cost is None else round(cumulative_cost, 6)
                 ),
@@ -206,9 +227,12 @@ def analyze(conv: Conversation, prices: PriceBook | None = None) -> AgentReport:
     provided_usage_details = _sum_int_maps(r.provided_usage_details for r in trace)
     cost_details = _sum_float_maps(r.cost_details for r in trace)
     provided_cost_details = _sum_float_maps(r.provided_cost_details for r in trace)
+    derived_cost_details = _sum_float_maps(r.derived_cost_details for r in trace)
+    cost_sources = _count_values(r.cost_source for r in trace)
+    unpriced_dimensions = sorted({dimension for r in trace for dimension in r.unpriced_dimensions})
     # None if any turn's price is unknown (uniform per conversation).
     total_cost: float | None = (
-        None if any(r.cost_usd is None for r in trace) else sum(r.cost_usd for r in trace)  # type: ignore[misc]
+        None if any(r.cost_usd is None for r in trace) else _total_cost_from_details(cost_details)
     )
     total_latency = sum(r.latency_ms for r in trace)
 
@@ -257,6 +281,9 @@ def analyze(conv: Conversation, prices: PriceBook | None = None) -> AgentReport:
         cost_estimate_usd=None if total_cost is None else round(total_cost, 6),
         cost_details={k: round(v, 6) for k, v in cost_details.items()},
         provided_cost_details={k: round(v, 6) for k, v in provided_cost_details.items()},
+        derived_cost_details={k: round(v, 6) for k, v in derived_cost_details.items()},
+        cost_sources=cost_sources,
+        unpriced_dimensions=unpriced_dimensions,
         success_turn=conv.success_turn,
         turns_to_success=turns_to_success,
         tokens_to_success=tokens_to_success,
@@ -281,6 +308,13 @@ def _sum_float_maps(maps) -> dict[str, float]:
         for key, value in item.items():
             total[key] = total.get(key, 0.0) + float(value)
     return total
+
+
+def _count_values(values) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    return counts
 
 
 def _finalize_cost_details(details: dict[str, float]) -> dict[str, float]:

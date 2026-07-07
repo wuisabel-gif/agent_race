@@ -73,6 +73,13 @@ def test_ledger_jsonl_export_writes_preview_rows(tmp_path, capsys):
     assert len(row["content_preview"]) <= 12
 
 
+def test_audit_reports_no_drift_for_samples(capsys):
+    rc = main(["audit", str(SAMPLES), "--threshold", "0.03"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "No cost drift" in out
+
+
 def test_formats_lists_parsers(capsys):
     rc = main(["formats"])
     out = capsys.readouterr().out

@@ -8,6 +8,7 @@ Examples
     tokenomist route job.md --agents agents.json --out runs/job1
     tokenomist trace data/samples --csv traces.csv
     tokenomist ledger data/samples --projection preview --jsonl ledger.jsonl
+    tokenomist audit data/samples --threshold 0.03
     tokenomist formats
 """
 
@@ -20,7 +21,14 @@ from pathlib import Path
 from . import __version__
 from .analyzer import AgentReport, analyze_many
 from .parsers import available_formats, load_conversations
-from .report import ledger_to_jsonl, rank_reports, render_table, reports_to_json, trace_to_csv
+from .report import (
+    ledger_to_jsonl,
+    rank_reports,
+    render_cost_audit,
+    render_table,
+    reports_to_json,
+    trace_to_csv,
+)
 from .router import load_agents, run_terminal_agent, write_example_config
 
 
@@ -97,6 +105,12 @@ def cmd_ledger(args: argparse.Namespace) -> int:
         print(f"Wrote {rows} ledger rows to {args.jsonl}")
     else:
         sys.stdout.write(jsonl_text)
+    return 0
+
+
+def cmd_audit(args: argparse.Namespace) -> int:
+    reports = _load(args)
+    print(render_cost_audit(reports, threshold=args.threshold))
     return 0
 
 
@@ -423,6 +437,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Characters kept per row when --projection preview is used.",
     )
     p_ledger.set_defaults(func=cmd_ledger)
+
+    p_audit = sub.add_parser(
+        "audit",
+        help="Flag provider/log cost values that drift from price-book-derived cost.",
+    )
+    _add_common(p_audit)
+    p_audit.add_argument(
+        "--threshold",
+        type=float,
+        default=0.03,
+        help="Relative drift threshold to report, e.g. 0.03 for 3 percent.",
+    )
+    p_audit.set_defaults(func=cmd_audit)
 
     p_formats = sub.add_parser("formats", help="List supported log formats.")
     p_formats.set_defaults(func=cmd_formats)

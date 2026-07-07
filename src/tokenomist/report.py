@@ -75,6 +75,49 @@ def reports_to_json(reports: list[AgentReport], *, include_trace: bool = False) 
     return json.dumps(payload, indent=2)
 
 
+def render_cost_audit(reports: list[AgentReport], *, threshold: float = 0.03) -> str:
+    """Show turns where provider/log cost disagrees with derived catalog cost."""
+
+    rows = []
+    for rep in reports:
+        for row in rep.trace:
+            if row.cost_source not in {"provided", "log"}:
+                continue
+            reported = _detail_total(row.cost_details)
+            derived = _detail_total(row.derived_cost_details)
+            if reported is None or derived is None or derived == 0:
+                continue
+            drift = (reported - derived) / derived
+            if abs(drift) >= threshold:
+                rows.append(
+                    [
+                        rep.task_id,
+                        rep.agent,
+                        str(row.turn_index),
+                        row.cost_source,
+                        f"${reported:.6f}",
+                        f"${derived:.6f}",
+                        f"{drift * 100:+.1f}%",
+                    ]
+                )
+
+    if not rows:
+        return f"No cost drift >= {threshold * 100:.1f}% found."
+
+    headers = ["Task", "Agent", "Turn", "Source", "Reported", "Derived", "Drift"]
+    widths = [len(header) for header in headers]
+    for row in rows:
+        for idx, cell in enumerate(row):
+            widths[idx] = max(widths[idx], len(cell))
+
+    def fmt(cells: list[str]) -> str:
+        return "  ".join(cell.ljust(widths[idx]) for idx, cell in enumerate(cells))
+
+    lines = [fmt(headers), fmt(["-" * width for width in widths])]
+    lines.extend(fmt(row) for row in rows)
+    return "\n".join(lines)
+
+
 def ledger_to_jsonl(
     reports: list[AgentReport],
     *,
@@ -112,6 +155,9 @@ def ledger_to_jsonl(
                 "cost_usd": row.cost_usd,
                 "cost_details": row.cost_details,
                 "provided_cost_details": row.provided_cost_details,
+                "derived_cost_details": row.derived_cost_details,
+                "cost_source": row.cost_source,
+                "unpriced_dimensions": row.unpriced_dimensions,
                 "latency_ms": row.latency_ms,
                 "tool_calls": row.tool_calls,
                 "tool_failures": row.tool_failures,
@@ -140,6 +186,12 @@ def _truncate_text(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[:limit]
 
 
+def _detail_total(details: dict[str, float]) -> float | None:
+    if not details:
+        return None
+    return details["total"] if "total" in details else sum(details.values())
+
+
 def trace_to_csv(reports: list[AgentReport]) -> str:
     """Flatten every report's per-turn trace into a single CSV document."""
 
@@ -160,6 +212,9 @@ def trace_to_csv(reports: list[AgentReport]) -> str:
         "cost_usd",
         "cost_details",
         "provided_cost_details",
+        "derived_cost_details",
+        "cost_source",
+        "unpriced_dimensions",
         "cumulative_cost_usd",
         "is_retry",
         "is_correction",
@@ -172,7 +227,7 @@ def trace_to_csv(reports: list[AgentReport]) -> str:
             for key in fieldnames:
                 value = getattr(row, key)
                 rendered[key] = (
-                    json.dumps(value, sort_keys=True) if isinstance(value, dict) else value
+                    json.dumps(value, sort_keys=True) if isinstance(value, dict | list) else value
                 )
             writer.writerow(rendered)
     return buf.getvalue()
