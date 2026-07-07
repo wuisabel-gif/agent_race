@@ -46,6 +46,33 @@ def test_trace_csv_has_header_and_rows(tmp_path, capsys):
     assert len(lines) > 1
 
 
+def test_ledger_jsonl_export_writes_preview_rows(tmp_path, capsys):
+    out_path = tmp_path / "ledger.jsonl"
+    rc = main(
+        [
+            "ledger",
+            str(SAMPLES),
+            "--projection",
+            "preview",
+            "--preview-chars",
+            "12",
+            "--jsonl",
+            str(out_path),
+        ]
+    )
+    printed = capsys.readouterr().out
+    assert rc == 0
+    assert "ledger rows" in printed
+    lines = out_path.read_text(encoding="utf-8").splitlines()
+    assert lines
+    row = json.loads(lines[0])
+    assert row["schema"] == "tokenomist.ledger.v1"
+    assert row["projection"] == "preview"
+    assert "content_preview" in row
+    assert "content" not in row
+    assert len(row["content_preview"]) <= 12
+
+
 def test_formats_lists_parsers(capsys):
     rc = main(["formats"])
     out = capsys.readouterr().out

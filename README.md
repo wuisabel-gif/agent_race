@@ -33,6 +33,9 @@ Three ways to use it:
 3. **Generate measured benchmark logs.** Use `harness/run_agent.py` on a coding
    task with hidden pytest tests, then analyze the logs it writes. This is the
    path for reporting cost per *correct* solution.
+4. **Export a ledger for real systems.** Use `tokenomist ledger <folder>` when
+   you want one JSONL row per turn for audit, replay, warehouse loading, or a
+   lightweight search index.
 
 ```
 Agent            Model          Turns  →Success  In tok  Out tok  Tools  Tool OK  Retries  Fixes  Latency  Cost     Score  Efficiency
@@ -155,6 +158,12 @@ tokenomist analyze data/samples --json reports.json
 # Export the per-turn traffic trace as CSV
 tokenomist trace data/samples --csv traces.csv
 
+# Export full per-turn ledger rows as JSONL
+tokenomist ledger data/samples --jsonl ledger.jsonl
+
+# Export preview rows for indexing/search without full message bodies
+tokenomist ledger data/samples --projection preview --jsonl ledger-preview.jsonl
+
 # Use your own up-to-date price book instead of the bundled one
 tokenomist analyze data/samples --prices my_prices.json
 
@@ -183,6 +192,34 @@ provider cost was supplied. An **unknown model reports cost as `n/a`** rather
 than a fabricated number. Prices are approximate public list prices for
 *relative* comparison, verified `2026-07-04`; update the file (and bump
 `last_verified`) or pass `--prices` to keep them current.
+
+### Ledger export
+
+`tokenomist trace` is compact CSV for charts and quick spreadsheet work.
+`tokenomist ledger` is the integration format for production-style pipelines:
+one JSONL object per turn with task, agent, model, token maps, cost maps,
+latency, tool/retry flags, correctness, convergence efficiency, and storage
+size diagnostics.
+
+Use the full projection when you need auditability or replay:
+
+```bash
+tokenomist ledger runs/fix-tests --projection full --jsonl ledger.jsonl
+```
+
+Use the preview projection when you want a small downstream index:
+
+```bash
+tokenomist ledger runs/fix-tests \
+  --projection preview \
+  --preview-chars 200 \
+  --jsonl ledger-preview.jsonl
+```
+
+The preview keeps the same accounting fields as the full ledger, but stores
+`content_preview` instead of `content` and marks whether the original message was
+truncated. Both projections include `record_bytes`, which helps spot unusually
+large turns before you load them into a warehouse or search system.
 
 ### Dashboard
 
@@ -395,7 +432,7 @@ src/tokenomist/
   prices.json      editable price book (per-model rates, verified 2026-07-04)
   parsers/         format detection + one parser per format
   analyzer.py      trace construction + aggregate metrics
-  report.py        table / JSON / CSV rendering and ranking
+  report.py        table / JSON / CSV / ledger rendering and ranking
   cli.py           command-line interface
   dashboard.py     Streamlit dashboard (optional)
 data/samples/      example logs, one per format

@@ -95,6 +95,22 @@ authoritative for that turn and adds `total` when it can be derived. If no
 provider cost is supplied, Tokenomist uses `cost_details` when present, otherwise
 it derives `cost_details` from the price book and usage map.
 
+### Ledger JSONL export
+
+For production pipelines, `tokenomist ledger <logs>` emits one JSONL object per
+turn. The full projection keeps message `content`; the preview projection keeps
+the same accounting fields but replaces the body with `content_preview` and
+`content_truncated`.
+
+```bash
+tokenomist ledger runs/fix-tests --projection full --jsonl ledger.jsonl
+tokenomist ledger runs/fix-tests --projection preview --jsonl ledger-preview.jsonl
+```
+
+Each row includes task and agent metadata, usage/cost provenance maps, latency,
+tool and retry flags, correctness, convergence efficiency, `content_length`, and
+`record_bytes` for storage/indexing diagnostics.
+
 ### Tool call object
 
 ```json
@@ -214,4 +230,5 @@ is a `type: "tool"` message.
   array (including `user`, `system`, and `tool` turns), 0-based.
 - **Different `task_id` per file** → agents won't be presented as the same race.
 - **Wrapping multiple conversations in one array** → upload separate files instead.
-- **Unknown `model` string** → pricing falls back to a generic rate; use a known id.
+- **Unknown `model` string** → cost reports as `n/a`; use a known id or pass
+  `--prices`.

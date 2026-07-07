@@ -7,6 +7,7 @@ Examples
     tokenomist init-agents --out agents.json
     tokenomist route job.md --agents agents.json --out runs/job1
     tokenomist trace data/samples --csv traces.csv
+    tokenomist ledger data/samples --projection preview --jsonl ledger.jsonl
     tokenomist formats
 """
 
@@ -19,7 +20,7 @@ from pathlib import Path
 from . import __version__
 from .analyzer import AgentReport, analyze_many
 from .parsers import available_formats, load_conversations
-from .report import rank_reports, render_table, reports_to_json, trace_to_csv
+from .report import ledger_to_jsonl, rank_reports, render_table, reports_to_json, trace_to_csv
 from .router import load_agents, run_terminal_agent, write_example_config
 
 
@@ -79,6 +80,23 @@ def cmd_trace(args: argparse.Namespace) -> int:
         print(f"Wrote {rows} trace rows to {args.csv}")
     else:
         sys.stdout.write(csv_text)
+    return 0
+
+
+def cmd_ledger(args: argparse.Namespace) -> int:
+    reports = _load(args)
+    jsonl_text = ledger_to_jsonl(
+        reports,
+        projection=args.projection,
+        preview_chars=args.preview_chars,
+    )
+    if args.jsonl:
+        with open(args.jsonl, "w", encoding="utf-8") as fh:
+            fh.write(jsonl_text)
+        rows = sum(len(r.trace) for r in reports)
+        print(f"Wrote {rows} ledger rows to {args.jsonl}")
+    else:
+        sys.stdout.write(jsonl_text)
     return 0
 
 
@@ -385,6 +403,26 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common(p_trace)
     p_trace.add_argument("--csv", metavar="PATH", help="Write CSV to PATH (default: stdout).")
     p_trace.set_defaults(func=cmd_trace)
+
+    p_ledger = sub.add_parser(
+        "ledger",
+        help="Export per-turn ledger rows as JSONL for audit, replay, or indexing.",
+    )
+    _add_common(p_ledger)
+    p_ledger.add_argument("--jsonl", metavar="PATH", help="Write JSONL to PATH (default: stdout).")
+    p_ledger.add_argument(
+        "--projection",
+        choices=["full", "preview"],
+        default="full",
+        help="full keeps content; preview truncates content for lightweight indexes.",
+    )
+    p_ledger.add_argument(
+        "--preview-chars",
+        type=int,
+        default=200,
+        help="Characters kept per row when --projection preview is used.",
+    )
+    p_ledger.set_defaults(func=cmd_ledger)
 
     p_formats = sub.add_parser("formats", help="List supported log formats.")
     p_formats.set_defaults(func=cmd_formats)

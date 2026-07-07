@@ -27,6 +27,8 @@ class TraceRow:
     model: str | None
     turn_index: int
     role: str
+    content: str
+    content_length: int
     input_tokens: int
     output_tokens: int
     usage_details: dict[str, int]
@@ -164,6 +166,8 @@ def build_trace(conv: Conversation, prices: PriceBook | None = None) -> list[Tra
                 model=conv.model,
                 turn_index=turn.index,
                 role=turn.role.value,
+                content=turn.content or "",
+                content_length=len(turn.content or ""),
                 input_tokens=in_toks,
                 output_tokens=out_toks,
                 usage_details=usage_details,

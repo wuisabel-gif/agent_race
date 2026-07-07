@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import json
 import os
 
 from tokenomist.analyzer import analyze, analyze_many, build_trace
 from tokenomist.models import Role
 from tokenomist.parsers import load_conversation, load_conversations, parse_data
-from tokenomist.report import rank_reports, render_table, reports_to_json, trace_to_csv
+from tokenomist.report import (
+    ledger_to_jsonl,
+    rank_reports,
+    render_table,
+    reports_to_json,
+    trace_to_csv,
+)
 
 SAMPLE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "samples")
 
@@ -79,6 +86,25 @@ def test_json_and_csv_export():
     assert "usage_details" in csv_text
     # One header line + at least one row per turn across all conversations.
     assert len(csv_text.strip().splitlines()) > len(reports)
+
+
+def test_ledger_jsonl_full_and_preview_exports():
+    reports = analyze_many(load_conversations([SAMPLE_DIR]))
+
+    full = ledger_to_jsonl(reports, projection="full")
+    first_full = json.loads(full.splitlines()[0])
+    assert first_full["schema"] == "tokenomist.ledger.v1"
+    assert first_full["projection"] == "full"
+    assert "content" in first_full
+    assert first_full["content_length"] == len(first_full["content"])
+    assert first_full["record_bytes"] > 0
+
+    preview = ledger_to_jsonl(reports, projection="preview", preview_chars=5)
+    first_preview = json.loads(preview.splitlines()[0])
+    assert first_preview["projection"] == "preview"
+    assert "content" not in first_preview
+    assert len(first_preview["content_preview"]) <= 5
+    assert first_preview["content_truncated"] == (first_preview["content_length"] > 5)
 
 
 def test_usage_and_cost_detail_maps_are_aggregated():

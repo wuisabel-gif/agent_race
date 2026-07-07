@@ -71,9 +71,7 @@ def _load_price_records(
     matchers: list[tuple[re.Pattern[str], ModelPrice]] = []
     for rec in data.get("models", []):
         family = str(rec["family"]).lower()
-        patterns = tuple(
-            str(pattern) for pattern in (rec.get("model_patterns") or [])
-        )
+        patterns = tuple(str(pattern) for pattern in (rec.get("model_patterns") or []))
         price = ModelPrice(
             input_per_mtok=float(rec["input"]),
             output_per_mtok=float(rec["output"]),

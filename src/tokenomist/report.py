@@ -75,6 +75,71 @@ def reports_to_json(reports: list[AgentReport], *, include_trace: bool = False) 
     return json.dumps(payload, indent=2)
 
 
+def ledger_to_jsonl(
+    reports: list[AgentReport],
+    *,
+    projection: str = "full",
+    preview_chars: int = 200,
+) -> str:
+    """Render per-turn ledger records as JSON Lines.
+
+    ``full`` preserves turn content. ``preview`` keeps the same accounting fields
+    but truncates content for fast list views and small downstream indexes.
+    """
+
+    if projection not in {"full", "preview"}:
+        raise ValueError("projection must be 'full' or 'preview'")
+
+    lines = []
+    for rep in reports:
+        for row in rep.trace:
+            content = row.content
+            record = {
+                "schema": "tokenomist.ledger.v1",
+                "projection": projection,
+                "record_id": f"{rep.task_id}:{rep.agent}:{row.turn_index}",
+                "task_id": rep.task_id,
+                "agent": rep.agent,
+                "model": rep.model,
+                "provider": rep.provider,
+                "turn_index": row.turn_index,
+                "role": row.role,
+                "content_length": row.content_length,
+                "input_tokens": row.input_tokens,
+                "output_tokens": row.output_tokens,
+                "usage_details": row.usage_details,
+                "provided_usage_details": row.provided_usage_details,
+                "cost_usd": row.cost_usd,
+                "cost_details": row.cost_details,
+                "provided_cost_details": row.provided_cost_details,
+                "latency_ms": row.latency_ms,
+                "tool_calls": row.tool_calls,
+                "tool_failures": row.tool_failures,
+                "is_retry": row.is_retry,
+                "is_correction": row.is_correction,
+                "final_correct": rep.final_correct,
+                "final_score": rep.final_score,
+                "convergence_efficiency": rep.convergence_efficiency,
+            }
+            if projection == "full":
+                record["content"] = content
+            else:
+                record["content_preview"] = _truncate_text(content, preview_chars)
+                record["content_truncated"] = len(content) > preview_chars
+
+            # Useful for spotting logs that will be expensive to store/index.
+            encoded = json.dumps(record, sort_keys=True, separators=(",", ":"))
+            record["record_bytes"] = len(encoded.encode("utf-8"))
+            lines.append(json.dumps(record, sort_keys=True))
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+def _truncate_text(text: str, limit: int) -> str:
+    if limit < 0:
+        raise ValueError("preview_chars must be non-negative")
+    return text if len(text) <= limit else text[:limit]
+
+
 def trace_to_csv(reports: list[AgentReport]) -> str:
     """Flatten every report's per-turn trace into a single CSV document."""
 
