@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,13 +8,13 @@ version = "0.1.0"
 description = "Measure, route, and compare AI agents by correctness, cost, latency, and tokens."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = ["llm", "agents", "workload-characterization", "observability", "tracing"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -26,17 +26,17 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/wuisabel-gif/tokenomist"
-Repository = "https://github.com/wuisabel-gif/tokenomist"
-Issues = "https://github.com/wuisabel-gif/tokenomist/issues"
-Changelog = "https://github.com/wuisabel-gif/tokenomist/blob/main/CHANGELOG.md"
-Demo = "https://wuisabel-gif.github.io/tokenomist/"
+Homepage = "https://github.com/wuisabel-gif/Tokenomist"
+Repository = "https://github.com/wuisabel-gif/Tokenomist"
+Issues = "https://github.com/wuisabel-gif/Tokenomist/issues"
+Changelog = "https://github.com/wuisabel-gif/Tokenomist/blob/main/CHANGELOG.md"
+Demo = "https://wuisabel-gif.github.io/Tokenomist/"
 
 [project.optional-dependencies]
 dashboard = ["streamlit>=1.30", "pandas>=2.0"]
 tokens = ["tiktoken>=0.6"]
 capture = ["openai>=1.0"]
-dev = ["pytest>=7.0", "ruff>=0.6"]
+dev = ["build>=1.2", "pytest>=7.0", "ruff>=0.6", "twine>=5.0"]
 
 [project.scripts]
 tokenomist = "tokenomist.cli:main"
@@ -45,7 +45,7 @@ tokenomist = "tokenomist.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-tokenomist = ["prices.json"]
+tokenomist = ["prices.json", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

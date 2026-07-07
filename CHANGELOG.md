@@ -43,5 +43,5 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   retries, corrections, convergence efficiency); table/JSON/CSV reporting and
   ranking; CLI; optional Streamlit dashboard; and a zero-dependency browser demo.
 
-[Unreleased]: https://github.com/wuisabel-gif/tokenomist/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/wuisabel-gif/tokenomist/releases/tag/v0.1.0
+[Unreleased]: https://github.com/wuisabel-gif/Tokenomist/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/wuisabel-gif/Tokenomist/releases/tag/v0.1.0

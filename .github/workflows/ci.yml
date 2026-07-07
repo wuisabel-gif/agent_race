@@ -48,3 +48,22 @@ jobs:
           python -m pip install -e ".[dev,tokens]"
       - name: Run tests
         run: pytest -q
+
+  package:
+    name: Build package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build and check distributions
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          python -m twine check dist/*
+      - name: Smoke-test installed wheel
+        run: |
+          python -m venv /tmp/tokenomist-wheel
+          /tmp/tokenomist-wheel/bin/python -m pip install dist/tokenomist-*.whl
+          /tmp/tokenomist-wheel/bin/tokenomist formats

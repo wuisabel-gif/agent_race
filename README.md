@@ -1,6 +1,6 @@
 # Tokenomist
 
-[![CI](https://github.com/wuisabel-gif/tokenomist/actions/workflows/ci.yml/badge.svg)](https://github.com/wuisabel-gif/tokenomist/actions/workflows/ci.yml)
+[![CI](https://github.com/wuisabel-gif/Tokenomist/actions/workflows/ci.yml/badge.svg)](https://github.com/wuisabel-gif/Tokenomist/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -115,11 +115,22 @@ deterministic ~4-chars/token heuristic.
 ### From source (for development)
 
 ```bash
-git clone https://github.com/wuisabel-gif/tokenomist
-cd tokenomist
+git clone https://github.com/wuisabel-gif/Tokenomist
+cd Tokenomist
 pip install -e ".[dev]"   # editable install with pytest + ruff
 pytest                    # run the test suite
 ```
+
+### Build the package
+
+```bash
+python -m build
+python -m twine check dist/*
+pipx run --spec dist/tokenomist-0.1.0-py3-none-any.whl tokenomist formats
+```
+
+The package installs the `tokenomist` console command and includes the bundled
+price book used for cost and latency estimates.
 
 ## Usage
 

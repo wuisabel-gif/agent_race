@@ -1,0 +1,7 @@
+include CHANGELOG.md
+include FORMAT.md
+include LICENSE
+include README.md
+include index.html
+recursive-include data/samples *.json
+recursive-include harness/tasks *.md *.py
