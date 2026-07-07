@@ -55,7 +55,7 @@ and covers current models across Anthropic, OpenAI, Google, Z.ai (GLM),
 DeepSeek, Mistral, MiniMax, Qwen, and Llama, plus retained legacy ids.
 
 Matching is by exact id/alias, then **longest family prefix**, then optional
-regex `match_patterns`, so a dated id like `claude-sonnet-4-6-20250514`
+regex `model_patterns`, so a dated id like `claude-sonnet-4-6-20250514`
 resolves to the `claude-sonnet-4-6` family, short aliases (`claude-sonnet`,
 `glm-5.1`, `gpt-5`) resolve to a current model, and provider strings like
 `zhipu/glm-5.1` or `deepseek/deepseek-chat` can be matched without hardcoding

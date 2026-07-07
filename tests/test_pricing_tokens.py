@@ -37,7 +37,7 @@ def test_longest_family_prefix_wins():
     assert price is DEFAULT_PRICES["claude-opus-4-8"]
 
 
-def test_match_patterns_resolve_provider_model_strings():
+def test_model_patterns_resolve_provider_model_strings():
     book = PriceBook()
     assert book.resolve("zhipu/glm-5.1") is DEFAULT_PRICES["glm-5.1"]
     assert book.resolve("deepseek/deepseek-chat") is DEFAULT_PRICES["deepseek-v4-pro"]
@@ -109,7 +109,7 @@ def test_pricebook_from_file(tmp_path):
                 "cache_read": 0.2,
                 "tps": 99,
                 "aliases": ["acme"],
-                "match_patterns": ["^provider/acme$"],
+                "model_patterns": ["^provider/acme$"],
             },
         ],
     }

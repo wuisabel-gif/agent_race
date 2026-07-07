@@ -171,7 +171,7 @@ tokenomist formats
 Model prices live in [`src/tokenomist/prices.json`](src/tokenomist/prices.json),
 not in code — each entry is a model *family* (a stable name prefix like
 `claude-sonnet-4-6`) plus input/output/cache-read rates per million tokens,
-aliases, optional regex `match_patterns`, and a rough throughput for latency
+aliases, optional regex `model_patterns`, and a rough throughput for latency
 estimation. Lookup matches exact ids/aliases, then longest family prefix, then
 regex patterns, so dated model ids such as `claude-sonnet-4-6-20250514` and
 provider strings such as `zhipu/glm-5.1` still resolve. Tokenomist stores derived

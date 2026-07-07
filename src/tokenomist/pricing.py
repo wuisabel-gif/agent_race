@@ -3,7 +3,7 @@
 Prices live in a data file (:data:`prices.json` next to this module) rather than
 in code, so they can be updated without touching logic and overridden per run.
 Each entry is a *family* — a stable model-name prefix such as ``claude-sonnet-4-6``
-— plus aliases, optional regex match patterns, USD-per-million-token
+— plus aliases, optional regex model patterns, USD-per-million-token
 input/output rates, an optional cached-input rate, and a rough output throughput
 used to estimate latency when a log has no timestamps. The numbers are
 approximate public list prices meant for *relative* comparison between agents,
@@ -12,7 +12,7 @@ not for billing.
 Model names in real logs carry dated suffixes, provider prefixes, and endpoint
 aliases (``claude-sonnet-4-6-20250514``, ``zhipu/glm-5.1``,
 ``deepseek-chat``), so lookup matches exact ids/aliases, longest family prefix,
-then regex match patterns. An unknown model yields ``cost = n/a`` rather than a
+then regex model patterns. An unknown model yields ``cost = n/a`` rather than a
 silently fabricated number.
 """
 
@@ -46,7 +46,7 @@ class ModelPrice:
     cache_read_per_mtok: float | None = None
     provider: str | None = None
     family: str | None = None
-    match_patterns: tuple[str, ...] = ()
+    model_patterns: tuple[str, ...] = ()
 
 
 def _load_price_records(
@@ -71,7 +71,9 @@ def _load_price_records(
     matchers: list[tuple[re.Pattern[str], ModelPrice]] = []
     for rec in data.get("models", []):
         family = str(rec["family"]).lower()
-        patterns = tuple(str(pattern) for pattern in rec.get("match_patterns", []) or [])
+        patterns = tuple(
+            str(pattern) for pattern in (rec.get("model_patterns") or [])
+        )
         price = ModelPrice(
             input_per_mtok=float(rec["input"]),
             output_per_mtok=float(rec["output"]),
@@ -81,7 +83,7 @@ def _load_price_records(
             ),
             provider=rec.get("provider"),
             family=family,
-            match_patterns=patterns,
+            model_patterns=patterns,
         )
         table[family] = price
         for alias in rec.get("aliases", []):
